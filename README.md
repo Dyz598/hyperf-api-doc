@@ -109,7 +109,7 @@ From this alone the generator documents:
   through the security config's `guards` binding.
 - **Path** from the controller prefix + `#[Mapping]` path; `{id}` placeholders (incl. Hyperf
   `{id:\d+}` patterns) become required path parameters.
-- **Naming** via the [namer](#naming-discoverynamer): `CreateUserAction` → summary "Create user",
+- **Naming** via the [namer](#naming-discoverynamer): `CreateUserAction` → summary "Create User",
   `App\Action\User\...` → tag "Users", operationId `CreateUserAction.handle`. Swap in any
   `OperationNamer` for non-Action layouts; Tier 2/3 documentation overrides any of them.
 
@@ -552,7 +552,7 @@ including the bare `#[ApiDoc]` marker form. Exclusions apply in both modes.
 
 The namer labels what nothing else labels: summary, tags, and operationId of inferred
 operations. The shipped `ActionOperationNamer` derives Action-style names —
-`CreatePostAction` → "Create post", `App\Action\Post\...` → tag "Posts",
+`CreatePostAction` → "Create Post", `App\Action\Post\...` → tag "Posts",
 `CreatePostAction.handle`. Tier 2/3 documentation and `#[ApiDoc(tags: ...)]` override it.
 
 Not using Action classes? Point `namer` at any `OperationNamer` implementation —

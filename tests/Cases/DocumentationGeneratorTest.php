@@ -64,7 +64,7 @@ class DocumentationGeneratorTest extends AbstractTestCase
         $spec = $this->generate();
         $operation = $spec['paths']['/v1/users']['post'];
 
-        $this->assertSame('Create user', $operation['summary']);
+        $this->assertSame('Create User', $operation['summary']);
         $this->assertSame('CreateUserAction.handle', $operation['operationId']);
         $this->assertSame(['Users'], $operation['tags']);
         $this->assertSame([['oauth2' => []]], $operation['security']);

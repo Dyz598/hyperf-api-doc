@@ -17,6 +17,7 @@ use HyperfApiDoc\Scanner\EnumRuleDetector;
 use HyperfTest\Fixtures\Constant\Gender;
 use HyperfTest\Fixtures\Constant\UserStatus;
 use HyperfTest\Fixtures\Constant\UserType;
+use HyperfTest\Fixtures\DTO\CamelFieldData;
 use HyperfTest\Fixtures\DTO\CreateLoanData;
 use HyperfTest\Fixtures\DTO\CreatePostData;
 use HyperfTest\Fixtures\DTO\CustomerData;
@@ -78,6 +79,20 @@ class SchemaResolverTest extends AbstractTestCase
         $this->assertSame('Unique user identifier.', $schema->properties['id']->description);
         $this->assertSame(123, $schema->properties['id']->example);
         $this->assertTrue($schema->properties['id']->hasExample);
+    }
+
+    public function testDtoFieldsAreSnakeCased()
+    {
+        $schema = (new SchemaResolver())->resolve(CamelFieldData::class);
+
+        $this->assertSame(['download_url', 'file_size', 'expires_at'], array_keys($schema->properties));
+        $this->assertSame(['download_url', 'file_size'], $schema->required);
+
+        // The overlay patches the inferred properties instead of creating
+        // camelCase twins.
+        $this->assertSame('Signed playback URL.', $schema->properties['download_url']->description);
+        $this->assertSame('date-time', $schema->properties['expires_at']->format);
+        $this->assertTrue($schema->properties['expires_at']->nullable);
     }
 
     public function testResolvesEnumSchema()

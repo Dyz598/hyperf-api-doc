@@ -54,7 +54,8 @@ class Inflector
     ];
 
     /**
-     * CreatePostAction -> "Create post".
+     * CreatePostAction -> "Create Post". Acronym segments keep their
+     * casing (URLShortenerAction -> "URL Shortener").
      */
     public static function actionSummary(string $classShortName): string
     {
@@ -65,12 +66,10 @@ class Inflector
             return $base;
         }
 
-        $words[0] = ucfirst(mb_strtolower($words[0]));
-        for ($i = 1, $count = count($words); $i < $count; ++$i) {
-            $words[$i] = mb_strtolower($words[$i]);
-        }
-
-        return implode(' ', $words);
+        return implode(' ', array_map(
+            static fn (string $word): string => ucfirst($word),
+            $words,
+        ));
     }
 
     /**
@@ -106,6 +105,16 @@ class Inflector
         $split = preg_split('/(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/', $value) ?: [];
 
         return array_values(array_filter(array_map('trim', $split), static fn (string $word) => $word !== ''));
+    }
+
+    /**
+     * fileSize -> "file_size"; leaves already-snake names untouched.
+     */
+    public static function snake(string $value): string
+    {
+        $value = preg_replace('/(.)([A-Z][a-z]+)/', '$1_$2', $value) ?? $value;
+
+        return mb_strtolower(preg_replace('/([a-z\d])([A-Z])/', '$1_$2', $value) ?? $value);
     }
 
     public static function reasonPhrase(int $status): string

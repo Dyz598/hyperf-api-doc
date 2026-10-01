@@ -18,7 +18,7 @@ use ReflectionClass;
 use ReflectionMethod;
 
 /**
- * Action-style naming: CreatePostAction -> "Create post",
+ * Action-style naming: CreatePostAction -> "Create Post",
  * Acem\Action\Post\... -> "Posts", CreatePostAction::handle -> "CreatePostAction.handle".
  */
 class ActionOperationNamer implements OperationNamer

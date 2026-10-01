@@ -34,6 +34,9 @@ class ApiParameter
 
     public ?array $enum = null;
 
+    /** Backing enum class when $enum came from an enum. */
+    public ?string $enumClass = null;
+
     public bool $deprecated = false;
 
     public function __construct(
@@ -98,6 +101,12 @@ class ApiParameter
     public function enum(?array $enum): static
     {
         $this->enum = $enum;
+        return $this;
+    }
+
+    public function enumClass(?string $enumClass): static
+    {
+        $this->enumClass = $enumClass;
         return $this;
     }
 

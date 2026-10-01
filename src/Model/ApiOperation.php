@@ -12,8 +12,10 @@ declare(strict_types=1);
 
 namespace HyperfApiDoc\Model;
 
+use BackedEnum;
 use HyperfApiDoc\Exception\InvalidConfigurationException;
 use HyperfApiDoc\Model\Concerns\HasExtensions;
+use HyperfApiDoc\Support\BackedEnums;
 
 use function Hyperf\Support\class_basename;
 
@@ -81,6 +83,9 @@ class ApiOperation
 
     /** Skip the configured validation/unauthorized default responses. */
     public bool $withoutDefaultResponses = false;
+
+    /** Include the configured forbidden (403) default response. */
+    public bool $forbidden = false;
 
     public function summary(?string $summary): static
     {
@@ -216,7 +221,7 @@ class ApiOperation
 
     /**
      * Suppress the globally configured default responses (validation 422,
-     * unauthorized 401) for this operation.
+     * unauthorized 401, forbidden 403) for this operation.
      */
     public function withoutDefaultResponses(bool $without = true): static
     {
@@ -225,7 +230,16 @@ class ApiOperation
     }
 
     /**
-     * @param array<string, array{description?: string, type?: string, format?: string, example?: mixed, enum?: array, required?: bool}> $parameters
+     * Include the globally configured forbidden (403) default response.
+     */
+    public function forbidden(bool $forbidden = true): static
+    {
+        $this->forbidden = $forbidden;
+        return $this;
+    }
+
+    /**
+     * @param array<string, array{description?: string, type?: string, format?: string, example?: mixed, enum?: array|class-string<BackedEnum>, required?: bool}> $parameters
      */
     public function pathParameters(array $parameters): static
     {
@@ -285,7 +299,7 @@ class ApiOperation
                     'type' => $parameter->type((string) $value),
                     'format' => $parameter->format((string) $value),
                     'example' => $parameter->example($value),
-                    'enum' => $parameter->enum((array) $value),
+                    'enum' => $this->applyParameterEnum($parameter, $value, (string) $name),
                     'required' => null,
                     'deprecated' => $parameter->deprecated((bool) $value),
                     default => throw new InvalidConfigurationException(sprintf(
@@ -300,5 +314,38 @@ class ApiOperation
         }
 
         return $this;
+    }
+
+    /**
+     * Accepts an array of values, a list of enum cases, or a backed enum
+     * class-string (whose case values are used and seed the example).
+     */
+    private function applyParameterEnum(ApiParameter $parameter, mixed $enum, string $name): void
+    {
+        if (is_string($enum) && enum_exists($enum)) {
+            $definition = BackedEnums::definition($enum);
+
+            if ($definition === null) {
+                throw new InvalidConfigurationException(sprintf(
+                    'Unit enum [%s] used for parameter [%s] has no backed values; configure explicit values instead.',
+                    $enum,
+                    $name
+                ));
+            }
+
+            $parameter->enum($definition[0]);
+            $parameter->enumClass($enum);
+
+            if (! $parameter->hasExample && $definition[0] !== []) {
+                $parameter->example($definition[0][0]);
+            }
+
+            return;
+        }
+
+        $parameter->enum(array_map(
+            static fn ($value) => $value instanceof BackedEnum ? $value->value : $value,
+            (array) $enum
+        ));
     }
 }

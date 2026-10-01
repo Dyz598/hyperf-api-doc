@@ -94,7 +94,7 @@ class RouteScannerTest extends AbstractTestCase
 
         $this->assertSame('POST', $operation->httpMethod);
         $this->assertSame('/v1/users', $operation->path);
-        $this->assertSame('Create user', $operation->summary);
+        $this->assertSame('Create User', $operation->summary);
         $this->assertSame(['Users'], $operation->tags);
         $this->assertSame('CreateUserAction.handle', $operation->operationId);
         $this->assertSame(CreateUserRequest::class, $operation->formRequest);
@@ -112,7 +112,7 @@ class RouteScannerTest extends AbstractTestCase
 
         $this->assertSame('GET', $operation->httpMethod);
         $this->assertSame('/v1/posts/{postId}', $operation->path);
-        $this->assertSame('Get post', $operation->summary);
+        $this->assertSame('Get Post', $operation->summary);
         $this->assertSame('Retrieve a single post by ID.', $operation->description);
         $this->assertSame(['Posts'], $operation->tags);
 
@@ -131,7 +131,7 @@ class RouteScannerTest extends AbstractTestCase
     {
         $operation = $this->scan()[CreatePostAction::class . '::handle'];
 
-        $this->assertSame('Create post', $operation->summary);
+        $this->assertSame('Create Post', $operation->summary);
         $this->assertSame(['Posts'], $operation->tags);
         $this->assertSame('authentik', $operation->authGuard);
 

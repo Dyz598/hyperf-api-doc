@@ -22,6 +22,7 @@ use HyperfApiDoc\Scanner\ValidationRuleParser;
 use HyperfApiDoc\Support\BackedEnums;
 use HyperfApiDoc\Support\ConfigInstances;
 use HyperfApiDoc\Support\HyperfClasses;
+use HyperfApiDoc\Support\Inflector;
 use ReflectionClass;
 use ReflectionNamedType;
 use ReflectionParameter;
@@ -196,7 +197,10 @@ class SchemaResolver
 
     /**
      * Infer a schema from constructor-promoted parameters and public
-     * properties (DTO / plain response classes).
+     * properties (DTO / plain response classes). PHP property names are
+     * snake_cased so inferred fields match the serialized JSON keys —
+     * a documentApiSchema() overlay then patches the same properties
+     * instead of creating camelCase twins.
      */
     private function inferFromClass(ReflectionClass $reflection): ApiSchema
     {
@@ -212,19 +216,21 @@ class SchemaResolver
                 }
 
                 $property = $this->propertyFromParameter($parameter);
+                $name = $parameter->getName();
+                $field = Inflector::snake($name);
 
                 if ($parameter->isDefaultValueAvailable()) {
                     $property->default($parameter->getDefaultValue());
                 } else {
-                    $schema->require($parameter->getName());
+                    $schema->require($field);
                 }
 
-                if ($this->isReadonlyProperty($reflection, $parameter->getName())) {
+                if ($this->isReadonlyProperty($reflection, $name)) {
                     $property->readOnly(true);
                 }
 
-                $schema->property($parameter->getName())->merge($property);
-                $seen[$parameter->getName()] = true;
+                $schema->property($field)->merge($property);
+                $seen[$name] = true;
             }
         }
 
@@ -235,7 +241,7 @@ class SchemaResolver
                 continue;
             }
 
-            $schema->property($property->getName())->merge($this->propertyFromType($property->getType()));
+            $schema->property(Inflector::snake($property->getName()))->merge($this->propertyFromType($property->getType()));
         }
 
         return $schema;

@@ -22,6 +22,7 @@ use HyperfApiDoc\Model\ApiSchema;
 use HyperfApiDoc\Model\ApiSecurityScheme;
 use HyperfApiDoc\Scanner\RouteScanner;
 use HyperfApiDoc\Security\SecurityRegistry;
+use HyperfApiDoc\Support\HyperfClasses;
 use ReflectionClass;
 use Throwable;
 
@@ -107,15 +108,42 @@ class DocumentationGenerator
 
     private function resolveRequest(ApiOperation $operation): void
     {
-        if ($operation->requestBody === null && $operation->formRequest !== null) {
+        // A GET body is not a thing; a GET FormRequest describes query and
+        // path input instead, documented as parameters.
+        if ($operation->requestBody === null
+            && $operation->formRequest !== null
+            && strtoupper($operation->httpMethod) !== 'GET') {
             $body = new ApiRequestBody();
             $body->schema($operation->formRequest);
             $operation->requestBody = $body;
         }
 
-        if ($operation->requestBody?->schemaClass !== null) {
-            $this->registerSchema($operation->requestBody->schemaClass);
+        $body = $operation->requestBody;
+
+        if ($body === null || $body->schemaClass === null) {
+            return;
         }
+
+        $this->registerSchema($body->schemaClass);
+
+        // File rules (format: binary) require multipart encoding.
+        if (! $body->contentTypeExplicit
+            && is_subclass_of($body->schemaClass, HyperfClasses::FORM_REQUEST)
+            && $this->hasBinaryProperty($this->resolver->resolve($body->schemaClass))) {
+            $body->contentType = 'multipart/form-data';
+        }
+    }
+
+    private function hasBinaryProperty(ApiSchema $schema): bool
+    {
+        foreach ($schema->properties as $property) {
+            if ($property->format === 'binary'
+                || ($property->items !== null && $property->items->format === 'binary')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function resolveResponses(ApiOperation $operation): void
@@ -135,6 +163,7 @@ class DocumentationGenerator
 
         $this->addAutoResponse($operation, 'validation', $operation->formRequest !== null);
         $this->addAutoResponse($operation, 'unauthorized', $operation->authGuard !== null);
+        $this->addAutoResponse($operation, 'forbidden', $operation->forbidden);
 
         foreach ($operation->responses as $response) {
             if (is_string($response->schema)) {
@@ -158,7 +187,11 @@ class DocumentationGenerator
         $schema = is_string($definition) ? $definition : ($definition['schema'] ?? null);
         $status = is_array($definition) && isset($definition['status'])
             ? (int) $definition['status']
-            : ($key === 'validation' ? 422 : 401);
+            : match ($key) {
+                'validation' => 422,
+                'forbidden' => 403,
+                default => 401,
+            };
 
         if ($operation->withoutDefaultResponses
             || ! $condition

@@ -14,18 +14,15 @@ namespace HyperfTest\Fixtures\ApiDoc;
 
 use HyperfApiDoc\Contract\ApiOperationDocumented;
 use HyperfApiDoc\Model\ApiOperation;
-use HyperfTest\Fixtures\Resource\ErrorResource;
-use HyperfTest\Fixtures\Resource\PostResource;
+use HyperfTest\Fixtures\DTO\MediaUploadedData;
 
-class CreatePostApi implements ApiOperationDocumented
+class IngestMediaApi implements ApiOperationDocumented
 {
     public function documentApi(ApiOperation $api): void
     {
         $api
-            ->summary('Create Post')
-            ->description('Create a new post owned by the given user.')
-            ->tags('Posts')
-            ->response(201, PostResource::class, description: 'Post created.')
-            ->response(404, ErrorResource::class, description: 'User not found.');
+            ->summary('Ingest Media')
+            ->tags('Media')
+            ->response(200, MediaUploadedData::class, 'Media ingested.');
     }
 }

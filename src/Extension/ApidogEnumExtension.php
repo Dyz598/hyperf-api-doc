@@ -15,18 +15,19 @@ namespace HyperfApiDoc\Extension;
 use BackedEnum;
 use HyperfApiDoc\Contract\ApiEnumDocumented;
 use HyperfApiDoc\Contract\SpecExtension;
+use HyperfApiDoc\Model\ApiParameter;
 use HyperfApiDoc\Model\ApiProperty;
 
 /**
- * Adds x-apidog-enum to enum-backed properties whose enum implements
- * ApiEnumDocumented, so Apidog shows each value with a name and a
- * description.
+ * Adds x-apidog-enum to enum-backed properties and parameters whose enum
+ * implements ApiEnumDocumented, so Apidog shows each value with a name
+ * and a description.
  */
 class ApidogEnumExtension implements SpecExtension
 {
     public function extend(object $node): array
     {
-        if (! $node instanceof ApiProperty
+        if ((! $node instanceof ApiProperty && ! $node instanceof ApiParameter)
             || $node->enumClass === null
             || ! is_a($node->enumClass, ApiEnumDocumented::class, true)) {
             return [];

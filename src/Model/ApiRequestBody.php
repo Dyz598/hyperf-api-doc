@@ -31,6 +31,9 @@ class ApiRequestBody
 
     public string $contentType = 'application/json';
 
+    /** Whether contentType() was called; explicit choices disable inference. */
+    public bool $contentTypeExplicit = false;
+
     public bool $required = true;
 
     public function description(?string $description): static
@@ -48,6 +51,7 @@ class ApiRequestBody
     public function contentType(string $contentType): static
     {
         $this->contentType = $contentType;
+        $this->contentTypeExplicit = true;
         return $this;
     }
 

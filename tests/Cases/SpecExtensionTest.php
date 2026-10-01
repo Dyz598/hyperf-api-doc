@@ -18,6 +18,7 @@ use HyperfApiDoc\Extension\ApidogEnumExtension;
 use HyperfApiDoc\Generator\SchemaRegistry;
 use HyperfApiDoc\Model\ApiDocument;
 use HyperfApiDoc\Model\ApiOperation;
+use HyperfApiDoc\Model\ApiParameter;
 use HyperfApiDoc\Model\ApiSchema;
 use HyperfApiDoc\Renderer\OpenApiRenderer;
 use HyperfTest\Fixtures\Constant\AccountStatus;
@@ -54,6 +55,56 @@ class SpecExtensionTest extends TestCase
 
         $this->assertSame([], $extension->extend($undocumented));
         $this->assertSame([], $extension->extend(new ApiOperation()));
+    }
+
+    public function testApidogEnumExtensionDescribesParameters()
+    {
+        $parameter = ApiParameter::path('status')
+            ->enum(['active', 'suspended'])
+            ->enumClass(AccountStatus::class);
+
+        $data = (new ApidogEnumExtension())->extend($parameter);
+
+        $this->assertSame([
+            ['value' => 'active', 'description' => 'Account is in good standing.'],
+            ['value' => 'suspended'],
+        ], $data['x-apidog-enum']);
+    }
+
+    public function testApidogEnumExtensionIgnoresUndocumentedParameterEnums()
+    {
+        $parameter = ApiParameter::query('status')
+            ->enum(['active', 'inactive'])
+            ->enumClass(UserStatus::class);
+
+        $this->assertSame([], (new ApidogEnumExtension())->extend($parameter));
+    }
+
+    public function testRendererMergesApidogEnumExtensionIntoParameters()
+    {
+        $renderer = new OpenApiRenderer(new SchemaRegistry(), [
+            'output' => ['extensions' => [ApidogEnumExtension::class]],
+        ]);
+
+        $operation = new ApiOperation();
+        $operation->httpMethod = 'GET';
+        $operation->path = '/v1/media/{status}';
+        $operation->parameter(
+            ApiParameter::path('status')
+                ->enum(['active', 'suspended'])
+                ->enumClass(AccountStatus::class)
+        );
+
+        $document = new ApiDocument();
+        $document->operation($operation);
+
+        $parameter = $renderer->render($document)['paths']['/v1/media/{status}']['get']['parameters'][0];
+
+        $this->assertSame(['active', 'suspended'], $parameter['schema']['enum']);
+        $this->assertSame(
+            ['value' => 'active', 'description' => 'Account is in good standing.'],
+            $parameter['x-apidog-enum'][0]
+        );
     }
 
     public function testSchemaEnumsRetainEnumClass()

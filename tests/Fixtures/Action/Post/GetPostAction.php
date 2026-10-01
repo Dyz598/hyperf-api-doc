@@ -36,7 +36,7 @@ class GetPostAction implements ApiOperationDocumented
     public function documentApi(ApiOperation $api): void
     {
         $api
-            ->summary('Get post')
+            ->summary('Get Post')
             ->description('Retrieve a single post by ID.')
             ->response(200, PostResource::class)
             ->response(404, ErrorResource::class, description: 'Post not found.');
