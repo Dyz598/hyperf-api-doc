@@ -121,15 +121,26 @@ class StrategyTest extends TestCase
         $this->assertSame([], $operation->responses);
     }
 
-    public function testResourceStrategySkipsWhenResponsesAreSet(): void
+    public function testResourceStrategySkipsWhenSameStatusIsSet(): void
     {
         $operation = new ApiOperation();
-        $operation->response(200);
+        $operation->response(201, WrappedResource::class);
         $operation = $this->build(new MenumbingResourceStrategy(TestWithResourceAttribute::class), 'ResourcedAction', 'explicit', $operation);
 
-        // Explicit documentation wins over the attribute.
+        // Explicit same-status documentation wins over the attribute.
         $this->assertCount(1, $operation->responses);
-        $this->assertNull($operation->findResponse(201));
+        $this->assertSame(WrappedResource::class, $operation->findResponse(201)->schema);
+    }
+
+    public function testResourceStrategyAddsSuccessDespiteErrorResponses(): void
+    {
+        $operation = new ApiOperation();
+        $operation->response(404, ErrorResource::class);
+        $operation = $this->build(new MenumbingResourceStrategy(TestWithResourceAttribute::class), 'ResourcedAction', 'explicit', $operation);
+
+        // Error responses do not block the success response from the attribute.
+        $this->assertSame(UserResource::class, $operation->findResponse(201)->schema);
+        $this->assertNotNull($operation->findResponse(404));
     }
 
     public function testReturnTypeStrategyDocumentsFirstCandidate(): void

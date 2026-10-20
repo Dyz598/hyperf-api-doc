@@ -18,10 +18,11 @@ use HyperfApiDoc\Scanner\ApiHandlerContext;
 
 /**
  * Documents the response from menumbing/resource's #[WithResource]
- * attribute — but only when no response is set yet, so explicit Tier 2/3
- * documentation wins. A #[WithResource] without an explicit resource class
- * relies on runtime auto-detection and reports nothing; ReturnTypeStrategy
- * covers those cases.
+ * attribute — unless an explicit response with the same status already
+ * exists, so Tier 2/3 documentation wins. Error responses (404 etc.) do
+ * not block the success response. A #[WithResource] without an explicit
+ * resource class relies on runtime auto-detection and reports nothing;
+ * ReturnTypeStrategy covers those cases.
  *
  * The attribute is matched by name only, so this strategy works (and
  * simply matches nothing) when the package is absent.
@@ -39,10 +40,6 @@ class MenumbingResourceStrategy implements ApiOperationStrategy
 
     public function build(ApiOperation $operation, ApiHandlerContext $context): void
     {
-        if ($operation->responses !== []) {
-            return;
-        }
-
         $attribute = $context->attribute($this->withResourceAttribute);
 
         if ($attribute === null) {
@@ -58,6 +55,10 @@ class MenumbingResourceStrategy implements ApiOperationStrategy
         $status = isset($attribute->statusCode) && is_int($attribute->statusCode)
             ? $attribute->statusCode
             : 200;
+
+        if ($operation->findResponse($status) !== null) {
+            return;
+        }
 
         $operation->response($status, $resource, configure: function ($response) use ($context) {
             if ($context->returnsCollection) {
