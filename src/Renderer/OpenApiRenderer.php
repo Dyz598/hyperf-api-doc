@@ -16,11 +16,13 @@ use HyperfApiDoc\Contract\SpecExtension;
 use HyperfApiDoc\Exception\InvalidConfigurationException;
 use HyperfApiDoc\Generator\SchemaRegistry;
 use HyperfApiDoc\Generator\SchemaResolver;
+use HyperfApiDoc\Model\ApiComposition;
 use HyperfApiDoc\Model\ApiDocument;
 use HyperfApiDoc\Model\ApiOperation;
 use HyperfApiDoc\Model\ApiParameter;
 use HyperfApiDoc\Model\ApiProperty;
 use HyperfApiDoc\Model\ApiRequestBody;
+use HyperfApiDoc\Model\ApiResponse;
 use HyperfApiDoc\Model\ApiSchema;
 use HyperfApiDoc\Support\ConfigInstances;
 use HyperfApiDoc\Support\Inflector;
@@ -28,7 +30,7 @@ use JsonSerializable;
 use stdClass;
 
 /**
- * Renders the intermediate model into an OpenAPI 3.0.3 array.
+ * Renders the intermediate model into an OpenAPI 3.1.2 array.
  *
  * Component emission is scoped per render() call: only schemas actually
  * referenced through $ref in the rendered paths are emitted under
@@ -114,6 +116,17 @@ class OpenApiRenderer
             $item['required'] = $schema->required;
         }
 
+        if ($schema->hasExample) {
+            $item['example'] = $this->normalizeValue($schema->example);
+        }
+
+        if ($schema->examples !== []) {
+            $item['examples'] = array_map(
+                fn (mixed $value): mixed => $this->normalizeValue($value),
+                $schema->examples
+            );
+        }
+
         return [...$item, ...$this->extensionsFor($schema), ...$schema->extensionData()];
     }
 
@@ -155,10 +168,6 @@ class OpenApiRenderer
             $item['default'] = $this->normalizeValue($property->default);
         }
 
-        if ($property->nullable === true) {
-            $item['nullable'] = true;
-        }
-
         foreach (['minimum', 'maximum', 'minLength', 'maxLength', 'minItems', 'maxItems', 'pattern'] as $constraint) {
             if ($property->{$constraint} !== null) {
                 $item[$constraint] = $property->{$constraint};
@@ -194,6 +203,12 @@ class OpenApiRenderer
             if ($property->required !== null && $property->required !== []) {
                 $item['required'] = $property->required;
             }
+        }
+
+        // 3.1 expresses nullability as a type array; no declared type
+        // means any value, null included
+        if ($property->nullable === true && isset($item['type']) && ! is_array($item['type'])) {
+            $item['type'] = [$item['type'], 'null'];
         }
 
         // A bare ref to an unmarked class renders its schema inline.
@@ -307,15 +322,25 @@ class OpenApiRenderer
 
     private function renderRequestBody(ApiRequestBody $body): array
     {
+        if ($body->composition !== null && $body->hasOverlay()) {
+            throw new InvalidConfigurationException(sprintf(
+                'Composed request bodies do not support field overlays; document the member classes for request body of [%s].',
+                $body->schemaClass ?? 'composition'
+            ));
+        }
+
         $item = ['required' => $body->required];
-        $schema = $this->schemaForClass($body->schemaClass, $body->hasOverlay() ? $body->overlay() : null);
 
         if ($body->description !== null) {
             $item['description'] = $body->description;
         }
 
+        $schema = $body->composition !== null
+            ? $this->renderComposition($body->composition)
+            : $this->schemaForClass($body->schemaClass, $body->hasOverlay() ? $body->overlay() : null);
+
         $item['content'] = [
-            $body->contentType => ['schema' => $schema],
+            $body->contentType => $this->mediaType($schema, $body),
         ];
 
         return [...$item, ...$body->extensionData()];
@@ -339,7 +364,15 @@ class OpenApiRenderer
 
             $schema = null;
 
-            if (is_string($response->schema)) {
+            if ($response->composition !== null) {
+                if ($response->hasOverlay() || $response->mergeClasses !== []) {
+                    throw new InvalidConfigurationException(
+                        'Composed responses do not support field overlays or merge(); document the member classes instead.'
+                    );
+                }
+
+                $schema = $this->renderComposition($response->composition);
+            } elseif (is_string($response->schema)) {
                 $schema = $this->schemaForClass(
                     $response->schema,
                     $response->hasOverlay() ? $response->overlay() : null
@@ -351,6 +384,8 @@ class OpenApiRenderer
                 );
             } elseif ($response->hasOverlay()) {
                 $schema = $this->renderSchema($response->overlay());
+            } elseif ($response->hasExample || $response->examples !== []) {
+                $schema = $this->renderSchema(null);
             }
 
             // Collections wrap the schema in an array, after envelopes.
@@ -360,7 +395,7 @@ class OpenApiRenderer
 
             if ($response->status !== 204 && $schema !== null) {
                 $item['content'] = [
-                    $response->contentType => ['schema' => $schema],
+                    $response->contentType => $this->mediaType($schema, $response),
                 ];
             }
 
@@ -370,6 +405,78 @@ class OpenApiRenderer
         }
 
         return $responses;
+    }
+
+    /**
+     * A oneOf/anyOf/allOf schema: class-string members resolve through
+     * the registry (reusable components become $refs), ApiSchema members
+     * render inline.
+     */
+    private function renderComposition(ApiComposition $composition): array
+    {
+        $item = [
+            $composition->keyword->value => array_map(
+                fn (ApiSchema|string $member): array|stdClass => is_string($member)
+                    ? $this->memberSchema($member)
+                    : $this->renderBodySchema($member),
+                $composition->members
+            ),
+        ];
+
+        if ($composition->discriminatorProperty !== null) {
+            $item['discriminator'] = ['propertyName' => $composition->discriminatorProperty];
+
+            if ($composition->discriminatorMapping !== []) {
+                $item['discriminator']['mapping'] = array_map(
+                    function (string $class): string {
+                        $ref = $this->refFor($class);
+
+                        if ($ref === null) {
+                            throw new InvalidConfigurationException(sprintf(
+                                'Discriminator mapping target [%s] must be a reusable #[ApiDocSchema] component.',
+                                $class
+                            ));
+                        }
+
+                        return $ref['$ref'];
+                    },
+                    $composition->discriminatorMapping
+                );
+            }
+        }
+
+        return $item;
+    }
+
+    /**
+     * A composition member: lazily registered so renderer-only usage
+     * resolves members; marked classes become $refs.
+     */
+    private function memberSchema(string $class): array|stdClass
+    {
+        if ($this->registry->schema($class) === null) {
+            $this->registry->register($class, $this->resolver->resolve($class));
+        }
+
+        return $this->schemaForClass($class);
+    }
+
+    /**
+     * The media type object: the body schema plus its example(s).
+     */
+    private function mediaType(array|stdClass $schema, ApiRequestBody|ApiResponse $node): array
+    {
+        $media = ['schema' => $schema];
+
+        if ($node->hasExample) {
+            $media['example'] = $this->normalizeValue($node->example);
+        }
+
+        if ($node->examples !== []) {
+            $media['examples'] = $node->examples;
+        }
+
+        return $media;
     }
 
     private function schemaForClass(?string $class, ?ApiSchema $overlay = null): array|stdClass

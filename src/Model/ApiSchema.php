@@ -42,6 +42,13 @@ class ApiSchema
     /** @var array<int, class-string> additional field classes, merged at render */
     public array $additionalFieldClasses = [];
 
+    public mixed $example = null;
+
+    public bool $hasExample = false;
+
+    /** @var array<int, mixed> payload examples */
+    public array $examples = [];
+
     public function title(?string $title): static
     {
         $this->title = $title;
@@ -75,9 +82,32 @@ class ApiSchema
     }
 
     /**
-     * @param array<string, mixed> $examples
+     * A whole-object payload example; a field subset is fine.
+     */
+    public function example(mixed $value): static
+    {
+        $this->example = $value;
+        $this->hasExample = true;
+
+        return $this;
+    }
+
+    /**
+     * Whole-object payload examples; field subsets are fine.
+     *
+     * @param array<int, mixed> $examples
      */
     public function examples(array $examples): static
+    {
+        $this->examples = array_values([...$this->examples, ...$examples]);
+
+        return $this;
+    }
+
+    /**
+     * @param array<string, mixed> $examples field name => example value
+     */
+    public function fieldExamples(array $examples): static
     {
         foreach ($examples as $name => $example) {
             $this->property((string) $name)->example($example);
@@ -156,6 +186,15 @@ class ApiSchema
     {
         $this->title ??= $other->title;
         $this->description ??= $other->description;
+
+        if ($other->hasExample && ! $this->hasExample) {
+            $this->example = $other->example;
+            $this->hasExample = true;
+        }
+
+        if ($other->examples !== []) {
+            $this->examples = array_values([...$this->examples, ...$other->examples]);
+        }
 
         foreach ($other->properties as $name => $property) {
             $this->properties[$name] = isset($this->properties[$name])

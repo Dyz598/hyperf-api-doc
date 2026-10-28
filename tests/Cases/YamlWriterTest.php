@@ -25,7 +25,7 @@ class YamlWriterTest extends AbstractTestCase
     public function testEncodesAndRoundTrips()
     {
         $spec = [
-            'openapi' => '3.0.3',
+            'openapi' => '3.1.2',
             'info' => ['title' => 'API', 'version' => '1.0.0'],
             'paths' => new stdClass(),
             'components' => [
@@ -50,7 +50,7 @@ class YamlWriterTest extends AbstractTestCase
         $this->assertSame([], $parsed['paths']);
         $this->assertSame($spec['components'], $parsed['components']);
         $this->assertSame($spec['info'], $parsed['info']);
-        $this->assertSame('3.0.3', $parsed['openapi']);
+        $this->assertSame('3.1.2', $parsed['openapi']);
     }
 
     public function testEmptyObjectsSurviveEncoding()

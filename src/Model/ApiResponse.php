@@ -13,18 +13,20 @@ declare(strict_types=1);
 namespace HyperfApiDoc\Model;
 
 use HyperfApiDoc\Exception\InvalidConfigurationException;
+use HyperfApiDoc\Model\Concerns\HasExamples;
 use HyperfApiDoc\Model\Concerns\HasExtensions;
 use HyperfApiDoc\Model\Concerns\HasSchemaOverlay;
 
 /**
  * The HTTP semantics of one operation response: status code, description,
- * headers, content type, and the body schema — a documented class-string
- * or a built ApiSchema (envelopes).
+ * headers, content type, and the body schema — a documented class-string,
+ * a built ApiSchema (envelopes), or a composition.
  */
 class ApiResponse
 {
     use HasExtensions;
     use HasSchemaOverlay;
+    use HasExamples;
 
     private const HEADER_KEYS = ['description', 'required', 'deprecated', 'schema', 'example', 'examples', 'content', '$ref'];
 
@@ -32,6 +34,8 @@ class ApiResponse
 
     /** Body schema: a documented class-string or a built ApiSchema. */
     public ApiSchema|string|null $schema = null;
+
+    public ?ApiComposition $composition = null;
 
     public string $contentType = 'application/json';
 
@@ -54,10 +58,35 @@ class ApiResponse
         return $this;
     }
 
-    public function schema(ApiSchema|string $schema): static
+    /**
+     * The body schema or a composition; the last call wins.
+     */
+    public function schema(ApiComposition|ApiSchema|string $schema): static
     {
-        $this->schema = $schema;
+        if ($schema instanceof ApiComposition) {
+            $this->schema = null;
+            $this->composition = $schema;
+        } else {
+            $this->composition = null;
+            $this->schema = $schema;
+        }
+
         return $this;
+    }
+
+    public function oneOf(ApiSchema|string ...$members): static
+    {
+        return $this->schema(ApiComposition::oneOf(...$members));
+    }
+
+    public function anyOf(ApiSchema|string ...$members): static
+    {
+        return $this->schema(ApiComposition::anyOf(...$members));
+    }
+
+    public function allOf(ApiSchema|string ...$members): static
+    {
+        return $this->schema(ApiComposition::allOf(...$members));
     }
 
     public function contentType(string $contentType): static

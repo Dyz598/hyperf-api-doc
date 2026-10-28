@@ -19,7 +19,7 @@ use HyperfApiDoc\Filter\ApiOperationFilter;
  */
 class ApiDocument
 {
-    public string $openapi = '3.0.3';
+    public string $openapi = '3.1.2';
 
     /** @var array{title: string, description?: null|string, version: string} */
     public array $info = [

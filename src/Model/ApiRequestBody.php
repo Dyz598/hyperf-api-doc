@@ -12,22 +12,27 @@ declare(strict_types=1);
 
 namespace HyperfApiDoc\Model;
 
+use HyperfApiDoc\Model\Concerns\HasExamples;
 use HyperfApiDoc\Model\Concerns\HasExtensions;
 use HyperfApiDoc\Model\Concerns\HasSchemaOverlay;
 
 /**
  * The request body of an operation. The body schema is referenced by
- * class-string and materialized by the SchemaResolver at generation time.
+ * class-string or a oneOf/anyOf/allOf composition, materialized by the
+ * SchemaResolver at generation time.
  */
 class ApiRequestBody
 {
     use HasExtensions;
     use HasSchemaOverlay;
+    use HasExamples;
 
     public ?string $description = null;
 
     /** @var null|class-string */
     public ?string $schemaClass = null;
+
+    public ?ApiComposition $composition = null;
 
     public string $contentType = 'application/json';
 
@@ -42,10 +47,35 @@ class ApiRequestBody
         return $this;
     }
 
-    public function schema(string $class): static
+    /**
+     * The single body schema class or a composition; the last call wins.
+     */
+    public function schema(ApiComposition|string $schema): static
     {
-        $this->schemaClass = $class;
+        if ($schema instanceof ApiComposition) {
+            $this->schemaClass = null;
+            $this->composition = $schema;
+        } else {
+            $this->composition = null;
+            $this->schemaClass = $schema;
+        }
+
         return $this;
+    }
+
+    public function oneOf(ApiSchema|string ...$members): static
+    {
+        return $this->schema(ApiComposition::oneOf(...$members));
+    }
+
+    public function anyOf(ApiSchema|string ...$members): static
+    {
+        return $this->schema(ApiComposition::anyOf(...$members));
+    }
+
+    public function allOf(ApiSchema|string ...$members): static
+    {
+        return $this->schema(ApiComposition::allOf(...$members));
     }
 
     public function contentType(string $contentType): static

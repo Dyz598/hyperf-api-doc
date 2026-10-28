@@ -30,7 +30,7 @@ class RequestMeta implements ApiSchemaDocumented
                 'hostname' => 'Hostname of the server that handled the request.',
                 'client_ip' => 'Client IP address the request originated from.',
             ])
-            ->examples([
+            ->fieldExamples([
                 'hostname' => 'api.example.com',
                 'client_ip' => '203.0.113.10',
             ])

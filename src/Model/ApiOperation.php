@@ -136,10 +136,10 @@ class ApiOperation
      * Register a response for an HTTP status. The schema describes the
      * body; the operation owns the HTTP semantics.
      *
-     * @param null|ApiSchema|class-string $schema body schema class or built schema
+     * @param null|ApiComposition|ApiSchema|class-string $schema body schema class, built schema, or composition
      * @param null|callable $configure escape hatch receiving the ApiResponse
      */
-    public function response(int $status, ApiSchema|string|null $schema = null, ?string $description = null, ?callable $configure = null): static
+    public function response(int $status, ApiComposition|ApiSchema|string|null $schema = null, ?string $description = null, ?callable $configure = null): static
     {
         if ($status < 100 || $status > 599) {
             throw new InvalidConfigurationException(sprintf(
@@ -177,9 +177,9 @@ class ApiOperation
     }
 
     /**
-     * @param class-string $request FormRequest or explicit schema class
+     * @param ApiComposition|class-string $request FormRequest, explicit schema class, or composition
      */
-    public function request(string $request, ?string $contentType = null, ?callable $configure = null): static
+    public function request(ApiComposition|string $request, ?string $contentType = null, ?callable $configure = null): static
     {
         $body = new ApiRequestBody();
         $body->schema($request);
@@ -193,6 +193,62 @@ class ApiOperation
         }
 
         $this->requestBody = $body;
+
+        return $this;
+    }
+
+    /**
+     * Single request body example.
+     */
+    public function requestExample(mixed $value): static
+    {
+        $this->requestBodyOrFail()->example($value);
+
+        return $this;
+    }
+
+    /**
+     * Named request body examples.
+     *
+     * @param array<string, array{summary?: string, description?: string, value?: mixed, externalValue?: string}> $examples
+     */
+    public function requestExamples(array $examples): static
+    {
+        $this->requestBodyOrFail()->examples($examples);
+
+        return $this;
+    }
+
+    /**
+     * Single body example for a registered response.
+     */
+    public function responseExample(int $status, mixed $value): static
+    {
+        $this->responseOrFail($status)->example($value);
+
+        return $this;
+    }
+
+    /**
+     * Named body examples for a registered response.
+     *
+     * @param array<string, array{summary?: string, description?: string, value?: mixed, externalValue?: string}> $examples
+     */
+    public function responseExamples(int $status, array $examples): static
+    {
+        $this->responseOrFail($status)->examples($examples);
+
+        return $this;
+    }
+
+    /**
+     * Document headers for a registered response.
+     *
+     * @param array<string, array<string, mixed>> $headers
+     */
+    public function responseHeaders(int $status, array $headers): static
+    {
+        $this->responseOrFail($status)->headers($headers);
 
         return $this;
     }
@@ -285,6 +341,27 @@ class ApiOperation
         }
 
         return sprintf('%s %s', $this->httpMethod, $this->path);
+    }
+
+    private function requestBodyOrFail(): ApiRequestBody
+    {
+        if ($this->requestBody === null) {
+            throw new InvalidConfigurationException(sprintf(
+                'Call request() before documenting request examples for operation [%s].',
+                $this->describe()
+            ));
+        }
+
+        return $this->requestBody;
+    }
+
+    private function responseOrFail(int $status): ApiResponse
+    {
+        return $this->findResponse($status) ?? throw new InvalidConfigurationException(sprintf(
+            'No response with status [%d] registered for operation [%s].',
+            $status,
+            $this->describe()
+        ));
     }
 
     private function addParameters(string $in, array $parameters, bool $required): static
