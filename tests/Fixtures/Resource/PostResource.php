@@ -28,7 +28,7 @@ class PostResource implements ApiSchemaDocumented
                 'title' => 'Post title.',
                 'status' => 'Current publication status.',
             ])
-            ->examples([
+            ->fieldExamples([
                 'id' => 456,
                 'title' => 'Hello',
                 'status' => 'published',

@@ -16,8 +16,8 @@ use HyperfApiDoc\Model\ApiSchema;
 
 /**
  * A lazily created field-level ApiSchema overlay, merged onto the
- * resolved schema at render time by the shared descriptions(), examples(),
- * enums(), and fields() shortcuts.
+ * resolved schema at render time by the shared descriptions(),
+ * fieldExamples(), enums(), and fields() shortcuts.
  */
 trait HasSchemaOverlay
 {
@@ -34,11 +34,11 @@ trait HasSchemaOverlay
     }
 
     /**
-     * @param array<string, mixed> $examples
+     * @param array<string, mixed> $examples field name => example value
      */
-    public function examples(array $examples): static
+    public function fieldExamples(array $examples): static
     {
-        $this->overlay()->examples($examples);
+        $this->overlay()->fieldExamples($examples);
         return $this;
     }
 

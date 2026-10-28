@@ -35,7 +35,7 @@ class PaginationMeta implements ApiSchemaDocumented
                 'to' => 'Index of the last item on the page; null when empty.',
                 'total' => 'Total number of items across all pages.',
             ])
-            ->examples([
+            ->fieldExamples([
                 'current_page' => 1,
                 'from' => 1,
                 'last_page' => 3,

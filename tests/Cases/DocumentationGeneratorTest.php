@@ -46,7 +46,7 @@ class DocumentationGeneratorTest extends AbstractTestCase
     {
         $spec = $this->generate();
 
-        $this->assertSame('3.0.3', $spec['openapi']);
+        $this->assertSame('3.1.2', $spec['openapi']);
         $this->assertSame('Fixture API', $spec['info']['title']);
         $this->assertSame('2.0.0', $spec['info']['version']);
 
@@ -87,7 +87,7 @@ class DocumentationGeneratorTest extends AbstractTestCase
         $this->assertArrayHasKey('200', $operation['responses']);
         $this->assertArrayHasKey('422', $operation['responses']);
         $this->assertArrayHasKey('401', $operation['responses']);
-        $this->assertSame('Unprocessable Entity', $operation['responses']['422']['description']);
+        $this->assertSame('Unprocessable Content', $operation['responses']['422']['description']);
         $this->assertSame('Unauthorized', $operation['responses']['401']['description']);
     }
 
@@ -336,6 +336,46 @@ class DocumentationGeneratorTest extends AbstractTestCase
         $spec = $this->generate($config);
 
         $this->assertArrayHasKey('400', $spec['paths']['/v1/users']['post']['responses']);
+    }
+
+    public function testResponsesWithoutExamplesGetSynthesizedOnes()
+    {
+        $spec = $this->generate();
+
+        $validation = $spec['paths']['/v1/users']['post']['responses']['422']['content']['application/json']['examples'];
+        $this->assertArrayHasKey('unprocessable_content', $validation);
+        $this->assertSame('Unprocessable Content', $validation['unprocessable_content']['summary']);
+        $this->assertIsArray($validation['unprocessable_content']['value']);
+
+        $unauthorized = $spec['paths']['/v1/users']['post']['responses']['401']['content']['application/json']['examples'];
+        $this->assertArrayHasKey('unauthorized', $unauthorized);
+
+        $post = $spec['paths']['/v1/posts/{postId}']['get']['responses'];
+        $this->assertArrayHasKey('success', $post['200']['content']['application/json']['examples']);
+        $this->assertSame('Success', $post['200']['content']['application/json']['examples']['success']['summary']);
+        $this->assertArrayHasKey('not_found', $post['404']['content']['application/json']['examples']);
+    }
+
+    public function testSynthesizedExampleKeysVaryPerStatus()
+    {
+        $config = $this->config();
+        $config['scan']['paths'] = [__DIR__ . '/../Fixtures/ActionStatuses'];
+
+        $spec = $this->generate($config);
+        $responses = $spec['paths']['/v1/statuses']['post']['responses'];
+
+        $created = $responses['201']['content']['application/json']['examples'];
+        $this->assertArrayHasKey('created', $created);
+        $this->assertSame('Created', $created['created']['summary']);
+
+        $conflict = $responses['409']['content']['application/json']['examples'];
+        $this->assertArrayHasKey('conflict', $conflict);
+        $this->assertSame('Conflict', $conflict['conflict']['summary']);
+
+        // Unmapped codes keep the status-class key
+        $teapot = $responses['418']['content']['application/json']['examples'];
+        $this->assertArrayHasKey('client_error', $teapot);
+        $this->assertSame('Client Error', $teapot['client_error']['summary']);
     }
 
     private function loanOperation(string $path): ApiOperation

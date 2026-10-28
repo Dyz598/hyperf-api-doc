@@ -24,7 +24,7 @@ class MetaResponseSchema implements ApiSchemaDocumented
                 'page' => 'Current page number.',
                 'per_page' => 'Number of items per page.',
             ])
-            ->examples([
+            ->fieldExamples([
                 'page' => 1,
                 'per_page' => 15,
             ]);

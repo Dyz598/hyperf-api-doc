@@ -284,7 +284,7 @@ class SchemaResolver
 
             $property->type = $this->mapType($name);
         } elseif ($type instanceof ReflectionUnionType) {
-            // Unions cannot be expressed in OpenAPI 3.0; leave untyped.
+            // Unions cannot be expressed as one OpenAPI type; leave untyped.
             $property->nullable = true;
         }
 

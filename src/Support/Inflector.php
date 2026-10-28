@@ -42,7 +42,7 @@ class Inflector
         413 => 'Payload Too Large',
         415 => 'Unsupported Media Type',
         418 => "I'm a teapot",
-        422 => 'Unprocessable Entity',
+        422 => 'Unprocessable Content',
         423 => 'Locked',
         428 => 'Precondition Required',
         429 => 'Too Many Requests',

@@ -14,8 +14,10 @@ namespace HyperfApiDoc\Generator;
 
 use HyperfApiDoc\Contract\ApiSecurityDocumented;
 use HyperfApiDoc\Exception\InvalidConfigurationException;
+use HyperfApiDoc\Model\ApiComposition;
 use HyperfApiDoc\Model\ApiDocument;
 use HyperfApiDoc\Model\ApiOperation;
+use HyperfApiDoc\Model\ApiProperty;
 use HyperfApiDoc\Model\ApiRequestBody;
 use HyperfApiDoc\Model\ApiResponse;
 use HyperfApiDoc\Model\ApiSchema;
@@ -35,7 +37,24 @@ use Throwable;
  */
 class DocumentationGenerator
 {
+    /** Example keys for common status codes; others use the status class. */
+    private const NAMED_EXAMPLES = [
+        200 => ['success', 'Success'],
+        201 => ['created', 'Created'],
+        202 => ['accepted', 'Accepted'],
+        400 => ['bad_request', 'Bad Request'],
+        401 => ['unauthorized', 'Unauthorized'],
+        403 => ['forbidden', 'Forbidden'],
+        404 => ['not_found', 'Not Found'],
+        409 => ['conflict', 'Conflict'],
+        422 => ['unprocessable_content', 'Unprocessable Content'],
+        429 => ['too_many_requests', 'Too Many Requests'],
+        500 => ['internal_server_error', 'Internal Server Error'],
+    ];
+
     protected SchemaRegistry $registry;
+
+    protected SchemaSampler $sampler;
 
     /** @var array<string, string> guard name => security scheme name */
     protected array $guardMap = [];
@@ -48,6 +67,7 @@ class DocumentationGenerator
         protected array $config = [],
     ) {
         $this->registry = new SchemaRegistry();
+        $this->sampler = new SchemaSampler($this->registry, $this->resolver);
     }
 
     public function generate(): ApiDocument
@@ -120,7 +140,26 @@ class DocumentationGenerator
 
         $body = $operation->requestBody;
 
-        if ($body === null || $body->schemaClass === null) {
+        if ($body === null) {
+            return;
+        }
+
+        if ($body->composition !== null) {
+            foreach ($this->compositionClasses($body->composition) as $class) {
+                $this->registerSchema($class);
+
+                // File rules (format: binary) in any member require multipart.
+                if (! $body->contentTypeExplicit
+                    && is_subclass_of($class, HyperfClasses::FORM_REQUEST)
+                    && $this->hasBinaryProperty($this->resolver->resolve($class))) {
+                    $body->contentType = 'multipart/form-data';
+                }
+            }
+
+            return;
+        }
+
+        if ($body->schemaClass === null) {
             return;
         }
 
@@ -132,6 +171,14 @@ class DocumentationGenerator
             && $this->hasBinaryProperty($this->resolver->resolve($body->schemaClass))) {
             $body->contentType = 'multipart/form-data';
         }
+    }
+
+    /**
+     * @return array<int, class-string>
+     */
+    private function compositionClasses(ApiComposition $composition): array
+    {
+        return array_values(array_filter($composition->members, 'is_string'));
     }
 
     private function hasBinaryProperty(ApiSchema $schema): bool
@@ -159,11 +206,19 @@ class DocumentationGenerator
             foreach ($response->mergeClasses as $class) {
                 $response->overlay()->merge($this->resolver->resolve($class));
             }
+
+            if ($response->composition !== null) {
+                foreach ($this->compositionClasses($response->composition) as $class) {
+                    $this->registerSchema($class);
+                }
+            }
         }
 
         $this->addAutoResponse($operation, 'validation', $operation->formRequest !== null);
         $this->addAutoResponse($operation, 'unauthorized', $operation->authGuard !== null);
         $this->addAutoResponse($operation, 'forbidden', $operation->forbidden);
+
+        $this->addSynthesizedResponseExamples($operation);
 
         foreach ($operation->responses as $response) {
             if (is_string($response->schema)) {
@@ -174,6 +229,82 @@ class DocumentationGenerator
                 }
             }
         }
+    }
+
+    /**
+     * Responses without documented examples get one sampled from their
+     * schema, named by status class — consumers like Apidog label the
+     * response "Example 1" otherwise.
+     */
+    private function addSynthesizedResponseExamples(ApiOperation $operation): void
+    {
+        foreach ($operation->responses as $response) {
+            if ($response->status === 204
+                || $response->hasExample
+                || $response->examples !== []) {
+                continue;
+            }
+
+            $schema = $this->sampleSource($response);
+
+            if ($schema === null) {
+                continue;
+            }
+
+            [$name, $summary] = $this->synthesizedExample($response->status);
+
+            $response->examples([
+                $name => ['summary' => $summary, 'value' => $this->sampler->sample($schema)],
+            ]);
+        }
+    }
+
+    private function sampleSource(ApiResponse $response): ?ApiSchema
+    {
+        if ($response->composition !== null) {
+            $first = $response->composition->members[0] ?? null;
+
+            if (! $first instanceof ApiSchema && ! is_string($first)) {
+                return null;
+            }
+
+            return is_string($first)
+                ? $this->registry->schema($first) ?? $this->resolver->resolve($first)
+                : $first;
+        }
+
+        if ($response->schema instanceof ApiSchema) {
+            $schema = $response->schema;
+        } elseif (is_string($response->schema)) {
+            $schema = $this->registry->schema($response->schema) ?? $this->resolver->resolve($response->schema);
+        } else {
+            return null;
+        }
+
+        if ($response->hasOverlay()) {
+            $schema = clone $schema;
+            $schema->properties = array_map(
+                static fn (ApiProperty $property): ApiProperty => clone $property,
+                $schema->properties
+            );
+            $schema->merge($response->overlay());
+        }
+
+        return $schema;
+    }
+
+    /**
+     * @return array{0: string, 1: string} example key and summary
+     */
+    private function synthesizedExample(int $status): array
+    {
+        return self::NAMED_EXAMPLES[$status] ?? match (true) {
+            $status < 200 => ['informational', 'Informational'],
+            $status < 300 => ['success', 'Success'],
+            $status < 400 => ['redirect', 'Redirect'],
+            $status < 500 => ['client_error', 'Client Error'],
+            default => ['server_error', 'Server Error'],
+        };
     }
 
     /**

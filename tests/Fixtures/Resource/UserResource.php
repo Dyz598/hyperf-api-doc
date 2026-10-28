@@ -27,7 +27,7 @@ class UserResource implements ApiSchemaDocumented
                 'name' => 'User display name.',
                 'email' => 'User email address.',
             ])
-            ->examples([
+            ->fieldExamples([
                 'id' => 123,
                 'name' => 'Aldi',
                 'email' => 'aldi@example.com',

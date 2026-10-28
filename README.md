@@ -6,7 +6,7 @@ attributes — so Actions stay free of OpenAPI attributes.
 
 - Infers request schemas from validation rules, responses from return types, security from auth attributes.
 - Three documentation tiers: inference, interface on the action, external definition class.
-- Outputs OpenAPI 3.0 JSON and/or YAML; the writer registry accepts custom formats. No swagger-php dependency.
+- Outputs OpenAPI 3.1 JSON and/or YAML; the writer registry accepts custom formats. No swagger-php dependency.
 - Per-document component scoping: each file only contains the schemas it references.
 
 ## Table of contents
@@ -23,6 +23,7 @@ attributes — so Actions stay free of OpenAPI attributes.
     - [The `ApiOperation` fluent API](#the-apioperation-fluent-api)
   - [Documenting schemas (`ApiSchemaDocumented`)](#documenting-schemas-apischemadocumented)
   - [Response envelopes](#response-envelopes)
+  - [Composition & examples](#composition--examples)
   - [Security](#security)
   - [Strategies](#strategies)
   - [Rule detectors](#rule-detectors)
@@ -181,10 +182,12 @@ Available on `$api` in both tiers:
 | Method | Purpose |
 | --- | --- |
 | `summary()`, `description()`, `tags()`, `operationId()`, `group()`, `deprecated()` | Operation metadata |
-| `request(string $schema, ?string $contentType, ?callable $configure)` | Request body (FormRequest or explicit schema class) |
-| `response(int $status, ?string $schema, ?string $description, ?callable $configure)` | One response per status (duplicates throw) |
+| `request(string\|ApiComposition $schema, ?string $contentType, ?callable $configure)` | Request body (FormRequest, explicit schema class, or composition) |
+| `response(int $status, string\|ApiSchema\|ApiComposition\|null $schema, ?string $description, ?callable $configure)` | One response per status (duplicates throw) |
 | `security(string ...$schemes)` / `public()` | Security requirements (OR-combined) / explicitly public |
 | `withoutDefaultResponses()` | Skip the configured validation/unauthorized default responses |
+| `forbidden()` | Include the configured forbidden (403) default response |
+| `requestExample()` / `requestExamples()`, `responseExample()` / `responseExamples()`, `responseHeaders()` | Media-type examples and response headers — see [Composition & examples](#composition--examples) |
 | `pathParameters()`, `queryParameters()`, `headerParameters()`, `cookieParameters()` | Parameter maps with `description/type/format/example/enum/required/deprecated` keys |
 | `parameter(ApiParameter $p)` | Single parameter object — built via the `ApiParameter::path()/query()/header()/cookie()` factories (all take an optional `$required` flag) |
 | `extensions(['x-internal' => true])` | `x-` vendor extensions |
@@ -197,12 +200,14 @@ $api->response(200, PostResource::class, 'The post.', function (ApiResponse $res
 });
 ```
 
-`ApiRequestBody` fluent methods: `description()`, `contentType()`, `required()`, plus
-the schema-level `descriptions()/examples()/enums()/fields()` overlay and `extensions()`.
+`ApiRequestBody` fluent methods: `description()`, `contentType()`, `required()`,
+`schema()` / `oneOf()/anyOf()/allOf()`, the media-type `example()/examples()`, plus the
+field-level `descriptions()/fieldExamples()/enums()/fields()` overlay and `extensions()`.
 
-`ApiResponse` fluent methods: `description()`, `schema()` (class-string or built
-`ApiSchema`), `contentType()`, `collection()`, `headers()`, plus the schema-level
-`descriptions()/examples()/enums()/fields()` overlay and `extensions()`.
+`ApiResponse` fluent methods: `description()`, `schema()` / `oneOf()/anyOf()/allOf()`,
+`contentType()`, `collection()`, `merge()`, `headers()`, the media-type
+`example()/examples()`, plus the field-level
+`descriptions()/fieldExamples()/enums()/fields()` overlay and `extensions()`.
 
 ## Documenting schemas (`ApiSchemaDocumented`)
 
@@ -231,7 +236,7 @@ class CreatePostRequest extends FormRequest implements ApiSchemaDocumented
                 'category' => 'Post category.',
                 'body'     => 'Post body content.',
             ])
-            ->examples([
+            ->fieldExamples([
                 'title'    => 'Hello',
                 'category' => 'general',
                 'body'     => 'Hello world!',
@@ -250,7 +255,7 @@ class PostResource extends JsonResource implements ApiSchemaDocumented
     {
         $schema
             ->descriptions(['category' => 'Post category.', /* ... */])
-            ->examples(['category' => 'general', /* ... */])
+            ->fieldExamples(['category' => 'general', /* ... */])
             ->enums(['category' => PostCategory::class]);
     }
 }
@@ -261,7 +266,8 @@ class PostResource extends JsonResource implements ApiSchemaDocumented
 | Method | Purpose |
 | --- | --- |
 | `title()`, `description()` | Schema-level metadata |
-| `descriptions(array)`, `examples(array)` | Per-field description / example maps |
+| `example(mixed)` / `examples(array)` | Whole-object payload examples; a field subset is fine |
+| `descriptions(array)`, `fieldExamples(array)` | Per-field description / example maps |
 | `enums(array)` | Per-field enum — backed enum class-string or explicit value array |
 | `fields(array)` | Raw constraint access: `type, format, description, example, default, enum, nullable, minimum, maximum, minLength, maxLength, minItems, maxItems, pattern, deprecated, readOnly, writeOnly` |
 | `require(string ...$names)` | Mark properties required |
@@ -299,6 +305,55 @@ menumbing's `RequestMeta` (hostname, client_ip) and core `PaginationMeta`
 (current_page, from, last_page, path, per_page, to, total) / `PaginationLinks` (first,
 last, prev, next) ship with the package; extend them to add fields. Swap menumbing's
 contribution with `new MenumbingJsonResourceStrategy(CustomFields::class)`.
+
+## Composition & examples
+
+Request and response bodies accept a `oneOf`/`anyOf`/`allOf` composition of schema
+classes, plus media-type examples and response headers — all straight on the
+operation:
+
+```php
+use HyperfApiDoc\Model\ApiComposition;
+
+$api->request(ApiComposition::oneOf(
+    OtpGrantRequest::class,
+    PasswordGrantRequest::class,
+    RefreshTokenGrantRequest::class,
+)->discriminator('grant_type', [
+    'otp' => OtpGrantRequest::class,
+    'password' => PasswordGrantRequest::class,
+    'refresh_token' => RefreshTokenGrantRequest::class,
+]))
+->requestExamples([
+    'otp_login' => ['summary' => 'OTP login', 'value' => ['grant_type' => 'otp', 'client_id' => 'mobile-app', 'otp' => '123456']],
+])
+->response(200, ApiComposition::oneOf(TokenIssued::class, TokenIssuedCookie::class), 'Tokens issued.')
+->responseHeaders(200, [
+    'Set-Cookie' => ['description' => 'Refresh token; cookie clients only.', 'schema' => ['type' => 'string']],
+])
+->responseExamples(200, [
+    'body_mode' => ['summary' => 'Refresh token in body', 'value' => ['access_token' => '...']],
+    'cookie_mode' => ['summary' => 'Refresh token in cookie', 'value' => ['access_token' => '...']],
+]);
+```
+
+- `oneOf()` / `anyOf()` / `allOf()` also exist directly on the request body and each
+  response (`$response->oneOf(...)`). Members are documented schema classes — marked
+  `#[ApiDocSchema]` classes become `$ref`s — or built `ApiSchema`s.
+- `discriminator()` is optional; mapping targets must be reusable components.
+- `requestExample()` / `responseExample()` set a single example; `requestExamples()` /
+  `responseExamples()` set named ones (`summary`, `description`, `value`, `externalValue`).
+- Schema classes carry payload examples too: `example([...])` for one sample,
+  `examples([...])` for several — field subsets are fine. Per-field example facets
+  live in `fieldExamples()`.
+- Responses without documented examples get one sampled from their schema. Keys
+  are snake_cased reason phrases for common codes (`created`, `bad_request`,
+  `unauthorized`, `forbidden`, `not_found`, `conflict`, `unprocessable_content`,
+  `too_many_requests`, `internal_server_error`; 200 stays `success`) and status
+  classes otherwise (`redirect`, `client_error`, `server_error`) — consumers like
+  Apidog label the response "Example 1" otherwise.
+- Compositions do not combine with field overlays or `merge()` — document the member
+  classes instead.
 
 ## Security
 
@@ -625,7 +680,7 @@ class PostResource extends JsonResource implements ApiSchemaDocumented { /* ... 
 
 | Rule | OpenAPI mapping |
 | --- | --- |
-| `required`, `nullable` | `required` list, `nullable` |
+| `required`, `nullable` | `required` list; nullable widens the type (`["string", "null"]`) |
 | `string` / `array` / `integer` / `numeric` / `boolean` / `uuid` / `email` / `url` / `date` / `date_format` | `type`, `format` |
 | `max:n` / `min:n` | `maxLength`/`maximum`/`maxItems` — typed by field |
 | `in:a,b` | `enum` values |
@@ -716,7 +771,7 @@ throw `InvalidConfigurationException`, reported cleanly by the command.
    undocumented.
 3. `DocumentationGenerator` merges union overlays, adds configured auto responses,
    and maps guards to security schemes.
-4. `OpenApiRenderer` turns the model into an OpenAPI 3.0 array — envelopes are
+4. `OpenApiRenderer` turns the model into an OpenAPI 3.1 array — envelopes are
    plain schemas by then; the writer registry encodes it. The model is
    renderer-agnostic — custom output formats only need a `Writer` implementation.
 

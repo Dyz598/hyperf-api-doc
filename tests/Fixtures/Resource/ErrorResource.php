@@ -27,7 +27,7 @@ class ErrorResource implements ApiSchemaDocumented
                 'error_description' => 'Human-readable error message.',
                 'code' => 'HTTP status code of the error.',
             ])
-            ->examples([
+            ->fieldExamples([
                 'error' => 'invalid_request',
                 'error_description' => 'The request is invalid.',
                 'code' => 422,

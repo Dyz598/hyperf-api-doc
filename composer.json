@@ -62,7 +62,7 @@
             "config": "HyperfApiDoc\\ConfigProvider"
         },
         "branch-alias": {
-            "dev-master": "1.x-dev"
+            "dev-master": "2.x-dev"
         }
     }
 }
