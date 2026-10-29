@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace HyperfApiDoc\Generator;
 
+use HyperfApiDoc\Concerns\MergesAdditionalFields;
 use HyperfApiDoc\Contract\ApiSecurityDocumented;
 use HyperfApiDoc\Exception\InvalidConfigurationException;
 use HyperfApiDoc\Model\ApiComposition;
@@ -37,6 +38,8 @@ use Throwable;
  */
 class DocumentationGenerator
 {
+    use MergesAdditionalFields;
+
     /** Example keys for common status codes; others use the status class. */
     private const NAMED_EXAMPLES = [
         200 => ['success', 'Success'],
@@ -280,6 +283,10 @@ class DocumentationGenerator
         } else {
             return null;
         }
+
+        // Same merge the renderer applies, so the sample carries the
+        // envelope's additional fields (menumbing's meta).
+        $schema = $this->withAdditionalFields($schema);
 
         if ($response->hasOverlay()) {
             $schema = clone $schema;

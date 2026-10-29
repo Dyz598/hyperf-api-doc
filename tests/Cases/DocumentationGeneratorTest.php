@@ -356,6 +356,24 @@ class DocumentationGeneratorTest extends AbstractTestCase
         $this->assertArrayHasKey('not_found', $post['404']['content']['application/json']['examples']);
     }
 
+    public function testSynthesizedExamplesIncludeEnvelopeMeta()
+    {
+        $config = $this->config();
+        $config['scan']['paths'] = [__DIR__ . '/../Fixtures/Action/Post'];
+        $config['strategies'] = [
+            new MenumbingResourceStrategy(TestWithResourceAttribute::class),
+            new MenumbingJsonResourceStrategy(withResourceAttribute: TestWithResourceAttribute::class),
+        ];
+
+        $spec = $this->generate($config);
+        $list = $spec['paths']['/v1/posts']['get']['responses']['200']['content']['application/json']['examples']['success']['value'];
+
+        $this->assertArrayHasKey('data', $list);
+        $this->assertArrayHasKey('meta', $list);
+        $this->assertSame('api.example.com', $list['meta']['hostname']);
+        $this->assertSame('203.0.113.10', $list['meta']['client_ip']);
+    }
+
     public function testSynthesizedExampleKeysVaryPerStatus()
     {
         $config = $this->config();
