@@ -1,5 +1,9 @@
 # hyperf-api-doc
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/dyz598/hyperf-api-doc.svg?style=flat-square)](https://packagist.org/packages/dyz598/hyperf-api-doc)
+[![Total Downloads](https://img.shields.io/packagist/dt/dyz598/hyperf-api-doc.svg?style=flat-square)](https://packagist.org/packages/dyz598/hyperf-api-doc)
+[![License](https://img.shields.io/packagist/l/dyz598/hyperf-api-doc.svg?style=flat-square)](https://packagist.org/packages/dyz598/hyperf-api-doc)
+
 OpenAPI documentation generator for [Hyperf](https://hyperf.io) 3.1. It infers the
 document from code you already write — validation rules, return types, resources, auth
 attributes — so Actions stay free of OpenAPI attributes.
@@ -23,7 +27,7 @@ attributes — so Actions stay free of OpenAPI attributes.
     - [The `ApiOperation` fluent API](#the-apioperation-fluent-api)
   - [Documenting schemas (`ApiSchemaDocumented`)](#documenting-schemas-apischemadocumented)
   - [Response envelopes](#response-envelopes)
-  - [Composition & examples](#composition--examples)
+  - [Composition \& examples](#composition--examples)
   - [Security](#security)
   - [Strategies](#strategies)
   - [Rule detectors](#rule-detectors)
