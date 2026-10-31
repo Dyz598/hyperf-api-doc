@@ -374,6 +374,18 @@ class DocumentationGeneratorTest extends AbstractTestCase
         $this->assertSame('203.0.113.10', $list['meta']['client_ip']);
     }
 
+    public function testRouteOnlyFormRequestGetsNoRequestBody()
+    {
+        $config = $this->config();
+        $config['scan']['paths'] = [__DIR__ . '/../Fixtures/ActionRouteParams'];
+
+        $spec = $this->generate($config);
+        $operation = $spec['paths']['/v1/route-posts/{post_id}/submit']['patch'];
+
+        $this->assertArrayNotHasKey('requestBody', $operation);
+        $this->assertArrayHasKey('422', $operation['responses'], 'The validation response is still documented');
+    }
+
     public function testSynthesizedExampleKeysVaryPerStatus()
     {
         $config = $this->config();

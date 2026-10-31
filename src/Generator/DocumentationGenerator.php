@@ -131,11 +131,12 @@ class DocumentationGenerator
 
     private function resolveRequest(ApiOperation $operation): void
     {
-        // A GET body is not a thing; a GET FormRequest describes query and
-        // path input instead, documented as parameters.
+        // A GET body is not a thing; neither is a form whose rules all
+        // target route placeholders. Both describe parameters instead.
         if ($operation->requestBody === null
             && $operation->formRequest !== null
-            && strtoupper($operation->httpMethod) !== 'GET') {
+            && strtoupper($operation->httpMethod) !== 'GET'
+            && ! $this->targetsOnlyRouteParameters($operation)) {
             $body = new ApiRequestBody();
             $body->schema($operation->formRequest);
             $operation->requestBody = $body;
@@ -194,6 +195,26 @@ class DocumentationGenerator
         }
 
         return false;
+    }
+
+    /**
+     * Whether every rule of the form request targets a route placeholder.
+     */
+    private function targetsOnlyRouteParameters(ApiOperation $operation): bool
+    {
+        if ($operation->formRequest === null) {
+            return false;
+        }
+
+        $fields = array_keys($this->resolver->resolve($operation->formRequest)->properties);
+
+        if ($fields === []) {
+            return false;
+        }
+
+        preg_match_all('/\{(\w+)\}/', $operation->path, $matches);
+
+        return array_diff($fields, $matches[1]) === [];
     }
 
     private function resolveResponses(ApiOperation $operation): void
