@@ -37,6 +37,9 @@ class SchemaRegistry
     /** @var array<class-string, null|false|string> false = unmarked, null = marked, string = explicit name */
     protected array $mark = [];
 
+    /** @var array<class-string, true> classes to emit even when unreferenced */
+    protected array $standalone = [];
+
     public function register(string $class, ApiSchema $schema): void
     {
         if (! isset($this->schemas[$class])) {
@@ -84,6 +87,19 @@ class SchemaRegistry
         }
 
         return $components;
+    }
+
+    /**
+     * Mark the class to emit as a component even when unreferenced.
+     */
+    public function markStandalone(string $class): void
+    {
+        $this->standalone[$class] = true;
+    }
+
+    public function isStandalone(string $class): bool
+    {
+        return isset($this->standalone[$class]);
     }
 
     /**

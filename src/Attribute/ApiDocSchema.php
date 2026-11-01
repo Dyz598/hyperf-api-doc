@@ -17,9 +17,14 @@ use Attribute;
 /**
  * Marks a class as a reusable schema component: it always renders as a
  * #/components/schemas $ref. Unmarked classes always render inline.
+ * With standalone: true the component is emitted even when no operation
+ * references it.
  */
 #[Attribute(Attribute::TARGET_CLASS)]
 final class ApiDocSchema
 {
-    public function __construct(public readonly ?string $name = null) {}
+    public function __construct(
+        public readonly ?string $name = null,
+        public readonly bool $standalone = false,
+    ) {}
 }

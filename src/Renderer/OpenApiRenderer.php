@@ -33,9 +33,10 @@ use stdClass;
 /**
  * Renders the intermediate model into an OpenAPI 3.1.2 array.
  *
- * Component emission is scoped per render() call: only schemas actually
+ * Component emission is scoped per render() call: schemas actually
  * referenced through $ref in the rendered paths are emitted under
- * components/schemas, so filtered documents never carry dead components.
+ * components/schemas, plus those marked #[ApiDocSchema(standalone: true)]
+ * — so filtered documents never carry dead components.
  */
 class OpenApiRenderer
 {
@@ -551,8 +552,8 @@ class OpenApiRenderer
         $schemas = [];
 
         foreach ($this->registry->reusable() as $class => $schema) {
-            // Emit only components actually referenced in this document.
-            if (isset($this->usedRefs[$class])) {
+            // Emit referenced components plus standalone-marked schemas.
+            if (isset($this->usedRefs[$class]) || $this->registry->isStandalone($class)) {
                 $schemas[(string) $this->registry->name($class)] = $this->renderSchema($schema);
             }
         }

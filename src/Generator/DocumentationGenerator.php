@@ -121,6 +121,9 @@ class DocumentationGenerator
             $document->operation($operation);
         }
 
+        // After the scan: standalone-marked schemas discovered in the paths.
+        $this->registerStandaloneSchemas();
+
         return $document;
     }
 
@@ -516,6 +519,18 @@ class DocumentationGenerator
         // reuse counting, so shared children become components.
         foreach ($this->resolver->dependencies($class) as $dependency) {
             $this->registry->register($dependency, $this->resolver->resolve($dependency));
+        }
+    }
+
+    /**
+     * Standalone-marked schemas found by the scanner register as
+     * components even when no operation references them.
+     */
+    private function registerStandaloneSchemas(): void
+    {
+        foreach ($this->scanner->standaloneSchemas() as $class) {
+            $this->registerSchema($class);
+            $this->registry->markStandalone($class);
         }
     }
 

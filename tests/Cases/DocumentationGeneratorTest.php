@@ -386,6 +386,34 @@ class DocumentationGeneratorTest extends AbstractTestCase
         $this->assertArrayHasKey('422', $operation['responses'], 'The validation response is still documented');
     }
 
+    public function testStandaloneMarkedSchemaEmitsAsComponent()
+    {
+        $config = $this->config();
+        $config['scan']['paths'] = [
+            __DIR__ . '/../Fixtures/ActionRouteParams',
+            __DIR__ . '/../Fixtures/SchemaStandalone',
+        ];
+
+        $spec = $this->generate($config);
+
+        $this->assertArrayHasKey('StandaloneUserSchema', $spec['components']['schemas']);
+        $status = $spec['components']['schemas']['StandaloneUserSchema']['properties']['status'];
+        $this->assertSame(['active', 'inactive', 'suspended'], $status['enum']);
+    }
+
+    public function testBareMarkedSchemaStaysAbsentWhenUnreferenced()
+    {
+        $config = $this->config();
+        $config['scan']['paths'] = [
+            __DIR__ . '/../Fixtures/ActionRouteParams',
+            __DIR__ . '/../Fixtures/SchemaStandalone',
+        ];
+
+        $spec = $this->generate($config);
+
+        $this->assertArrayNotHasKey('ReferencedOnlySchema', $spec['components']['schemas']);
+    }
+
     public function testSynthesizedExampleKeysVaryPerStatus()
     {
         $config = $this->config();

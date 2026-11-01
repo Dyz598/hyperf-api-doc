@@ -17,6 +17,7 @@ use Hyperf\HttpServer\Annotation\AutoController;
 use Hyperf\HttpServer\Annotation\Controller;
 use Hyperf\HttpServer\Annotation\Mapping;
 use HyperfApiDoc\Attribute\ApiDoc;
+use HyperfApiDoc\Attribute\ApiDocSchema;
 use HyperfApiDoc\Contract\ApiOperationDocumented;
 use HyperfApiDoc\Contract\ApiOperationStrategy;
 use HyperfApiDoc\Contract\OperationNamer;
@@ -70,6 +71,9 @@ class RouteScanner
     /** @var null|array<int, string> validated exclude patterns, null until first use */
     protected ?array $excludePatterns = null;
 
+    /** @var array<int, class-string> classes marked #[ApiDocSchema(standalone: true)] */
+    protected array $standaloneSchemas = [];
+
     public function __construct(protected array $config = [])
     {
         $this->returnTypeResolver = new ReturnTypeResolver();
@@ -91,6 +95,16 @@ class RouteScanner
         }
 
         return $operations;
+    }
+
+    /**
+     * Classes marked #[ApiDocSchema(standalone: true)] found during scan().
+     *
+     * @return array<int, class-string>
+     */
+    public function standaloneSchemas(): array
+    {
+        return $this->standaloneSchemas;
     }
 
     /**
@@ -144,6 +158,8 @@ class RouteScanner
             || $reflection->isTrait()) {
             return [];
         }
+
+        $this->collectStandaloneSchema($reflection);
 
         $controller = $this->controllerAttribute($reflection);
 
@@ -463,6 +479,19 @@ class RouteScanner
         }
 
         return null;
+    }
+
+    private function collectStandaloneSchema(ReflectionClass $reflection): void
+    {
+        $attributes = $reflection->getAttributes(ApiDocSchema::class);
+
+        if ($attributes === [] || ! $attributes[0]->newInstance()->standalone) {
+            return;
+        }
+
+        if (! in_array($reflection->getName(), $this->standaloneSchemas, true)) {
+            $this->standaloneSchemas[] = $reflection->getName();
+        }
     }
 
     private function parameterType(?ReflectionParameter $parameter): ?string
