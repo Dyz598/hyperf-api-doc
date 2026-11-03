@@ -15,16 +15,14 @@ namespace HyperfApiDoc\Attribute;
 use Attribute;
 
 /**
- * Marks a class as a reusable schema component: it always renders as a
- * #/components/schemas $ref. Unmarked classes always render inline.
- * With standalone: true the component is emitted even when no operation
- * references it.
+ * Marks a class as a published schema component: it renders as a
+ * #/components/schemas $ref and is emitted under components/schemas even
+ * when no operation references it. Unmarked classes always render inline.
  */
 #[Attribute(Attribute::TARGET_CLASS)]
 final class ApiDocSchema
 {
     public function __construct(
         public readonly ?string $name = null,
-        public readonly bool $standalone = false,
     ) {}
 }

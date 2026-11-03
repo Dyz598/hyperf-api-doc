@@ -386,32 +386,32 @@ class DocumentationGeneratorTest extends AbstractTestCase
         $this->assertArrayHasKey('422', $operation['responses'], 'The validation response is still documented');
     }
 
-    public function testStandaloneMarkedSchemaEmitsAsComponent()
+    public function testMarkedSchemaEmitsAsComponent()
     {
         $config = $this->config();
         $config['scan']['paths'] = [
             __DIR__ . '/../Fixtures/ActionRouteParams',
-            __DIR__ . '/../Fixtures/SchemaStandalone',
+            __DIR__ . '/../Fixtures/SchemaMarked',
         ];
 
         $spec = $this->generate($config);
 
-        $this->assertArrayHasKey('StandaloneUserSchema', $spec['components']['schemas']);
-        $status = $spec['components']['schemas']['StandaloneUserSchema']['properties']['status'];
+        $this->assertArrayHasKey('MarkedUserSchema', $spec['components']['schemas']);
+        $status = $spec['components']['schemas']['MarkedUserSchema']['properties']['status'];
         $this->assertSame(['active', 'inactive', 'suspended'], $status['enum']);
     }
 
-    public function testBareMarkedSchemaStaysAbsentWhenUnreferenced()
+    public function testUnmarkedSchemaStaysAbsentWhenUnreferenced()
     {
         $config = $this->config();
         $config['scan']['paths'] = [
             __DIR__ . '/../Fixtures/ActionRouteParams',
-            __DIR__ . '/../Fixtures/SchemaStandalone',
+            __DIR__ . '/../Fixtures/SchemaMarked',
         ];
 
         $spec = $this->generate($config);
 
-        $this->assertArrayNotHasKey('ReferencedOnlySchema', $spec['components']['schemas']);
+        $this->assertArrayNotHasKey('UnmarkedSchema', $spec['components']['schemas']);
     }
 
     public function testSynthesizedExampleKeysVaryPerStatus()

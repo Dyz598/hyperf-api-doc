@@ -10,20 +10,17 @@ declare(strict_types=1);
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
 
-namespace HyperfTest\Fixtures\SchemaStandalone;
+namespace HyperfTest\Fixtures\SchemaMarked;
 
-use HyperfApiDoc\Attribute\ApiDocSchema;
 use HyperfApiDoc\Contract\ApiSchemaDocumented;
 use HyperfApiDoc\Model\ApiSchema;
-use HyperfTest\Fixtures\Constant\UserStatus;
 
-#[ApiDocSchema(standalone: true)]
-class StandaloneUserSchema implements ApiSchemaDocumented
+class UnmarkedSchema implements ApiSchemaDocumented
 {
     public function documentApiSchema(ApiSchema $schema): void
     {
-        $schema
-            ->title('StandaloneUserSchema')
-            ->enums(['status' => UserStatus::class]);
+        $schema->title('UnmarkedSchema')->fields([
+            'name' => ['type' => 'string'],
+        ]);
     }
 }

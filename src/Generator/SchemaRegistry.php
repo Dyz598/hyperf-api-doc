@@ -20,8 +20,9 @@ use ReflectionClass;
 use function Hyperf\Support\class_basename;
 
 /**
- * Tracks registered schemas. Classes marked #[ApiDocSchema] always render
- * as reusable components/schemas $refs; unmarked classes render inline.
+ * Tracks registered schemas. Classes marked #[ApiDocSchema] render as
+ * components/schemas $refs and are emitted even when unreferenced;
+ * unmarked classes render inline.
  */
 class SchemaRegistry
 {
@@ -36,9 +37,6 @@ class SchemaRegistry
 
     /** @var array<class-string, null|false|string> false = unmarked, null = marked, string = explicit name */
     protected array $mark = [];
-
-    /** @var array<class-string, true> classes to emit even when unreferenced */
-    protected array $standalone = [];
 
     public function register(string $class, ApiSchema $schema): void
     {
@@ -87,19 +85,6 @@ class SchemaRegistry
         }
 
         return $components;
-    }
-
-    /**
-     * Mark the class to emit as a component even when unreferenced.
-     */
-    public function markStandalone(string $class): void
-    {
-        $this->standalone[$class] = true;
-    }
-
-    public function isStandalone(string $class): bool
-    {
-        return isset($this->standalone[$class]);
     }
 
     /**

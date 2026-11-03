@@ -71,8 +71,8 @@ class RouteScanner
     /** @var null|array<int, string> validated exclude patterns, null until first use */
     protected ?array $excludePatterns = null;
 
-    /** @var array<int, class-string> classes marked #[ApiDocSchema(standalone: true)] */
-    protected array $standaloneSchemas = [];
+    /** @var array<int, class-string> classes marked #[ApiDocSchema] */
+    protected array $markedSchemas = [];
 
     public function __construct(protected array $config = [])
     {
@@ -98,13 +98,13 @@ class RouteScanner
     }
 
     /**
-     * Classes marked #[ApiDocSchema(standalone: true)] found during scan().
+     * Classes marked #[ApiDocSchema] found during scan().
      *
      * @return array<int, class-string>
      */
-    public function standaloneSchemas(): array
+    public function markedSchemas(): array
     {
-        return $this->standaloneSchemas;
+        return $this->markedSchemas;
     }
 
     /**
@@ -159,7 +159,7 @@ class RouteScanner
             return [];
         }
 
-        $this->collectStandaloneSchema($reflection);
+        $this->collectMarkedSchema($reflection);
 
         $controller = $this->controllerAttribute($reflection);
 
@@ -481,16 +481,14 @@ class RouteScanner
         return null;
     }
 
-    private function collectStandaloneSchema(ReflectionClass $reflection): void
+    private function collectMarkedSchema(ReflectionClass $reflection): void
     {
-        $attributes = $reflection->getAttributes(ApiDocSchema::class);
-
-        if ($attributes === [] || ! $attributes[0]->newInstance()->standalone) {
+        if ($reflection->getAttributes(ApiDocSchema::class) === []) {
             return;
         }
 
-        if (! in_array($reflection->getName(), $this->standaloneSchemas, true)) {
-            $this->standaloneSchemas[] = $reflection->getName();
+        if (! in_array($reflection->getName(), $this->markedSchemas, true)) {
+            $this->markedSchemas[] = $reflection->getName();
         }
     }
 

@@ -667,13 +667,13 @@ the `$ref`s that document actually uses.
 
 ## Reusable components (`#[ApiDocSchema]`)
 
-- A class marked `#[ApiDocSchema]` always renders as a `#/components/schemas` `$ref`,
-  even when used once. `#[ApiDocSchema(name: 'Post')]` sets the component name;
-  duplicate explicit names throw.
+- A class marked `#[ApiDocSchema]` always renders as a `#/components/schemas` `$ref`
+  and is emitted as a component even when no operation references it — for
+  reference-only schemas such as models documenting their enum values.
+  `#[ApiDocSchema(name: 'Post')]` sets the component name; duplicate explicit
+  names throw. Marked classes are discovered within the configured scan paths;
+  remove the attribute to unpublish.
 - Unmarked classes always render inline, no matter how often they are used.
-- `#[ApiDocSchema(standalone: true)]` emits the component even when no operation
-  references it — for reference-only schemas such as models documenting their
-  enum values. Discovered within the configured scan paths.
 - Nested DTO classes (constructor-promoted properties, readonly properties) are expanded
   recursively up to depth 5, with cycle protection; mark a nested class to render it as
   a component `$ref` instead.

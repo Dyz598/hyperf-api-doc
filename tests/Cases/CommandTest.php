@@ -89,7 +89,7 @@ class CommandTest extends AbstractTestCase
         $this->assertSame(['/v1/status'], array_keys($public['spec']['paths']));
     }
 
-    public function testDocumentsScopeComponentsToTheirRefs()
+    public function testFilteredDocumentsShareMarkedComponents()
     {
         $config = $this->config();
         $config['documents'] = [
@@ -99,11 +99,12 @@ class CommandTest extends AbstractTestCase
 
         [$posts, $users] = ApiDocGenerateCommand::buildTargets($config);
 
+        // Paths stay scoped per document; marked schemas emit in both.
         $this->assertArrayHasKey('PostResource', $posts['spec']['components']['schemas']);
-        $this->assertArrayNotHasKey('UserResource', $posts['spec']['components']['schemas']);
+        $this->assertArrayHasKey('UserResource', $posts['spec']['components']['schemas']);
 
+        $this->assertArrayHasKey('PostResource', $users['spec']['components']['schemas']);
         $this->assertArrayHasKey('UserResource', $users['spec']['components']['schemas']);
-        $this->assertArrayNotHasKey('PostResource', $users['spec']['components']['schemas']);
     }
 
     public function testCliFiltersCollapseToSingleTarget()

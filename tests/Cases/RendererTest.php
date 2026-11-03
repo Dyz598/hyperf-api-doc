@@ -33,7 +33,7 @@ use HyperfTest\Fixtures\Resource\UserResource;
  */
 class RendererTest extends AbstractTestCase
 {
-    public function testComponentsAreScopedToRefsUsedByTheDocument()
+    public function testMarkedComponentsEmitWhetherReferencedOrNot()
     {
         $resolver = new SchemaResolver();
         $registry = $this->populatedRegistry($resolver);
@@ -43,15 +43,11 @@ class RendererTest extends AbstractTestCase
         );
 
         $this->assertArrayHasKey('PostResource', $postsOnly['components']['schemas']);
-        $this->assertArrayNotHasKey('UserResource', $postsOnly['components']['schemas']);
-
-        // A fresh renderer for the second document emits only UserResource.
-        $usersOnly = (new OpenApiRenderer($registry))->render(
-            $this->document('/v1/users/current', UserResource::class)
+        $this->assertArrayHasKey(
+            'UserResource',
+            $postsOnly['components']['schemas'],
+            'Marked schemas emit even when the document never references them',
         );
-
-        $this->assertArrayHasKey('UserResource', $usersOnly['components']['schemas']);
-        $this->assertArrayNotHasKey('PostResource', $usersOnly['components']['schemas']);
     }
 
     public function testResponseHeadersRender()

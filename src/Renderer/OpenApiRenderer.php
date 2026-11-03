@@ -33,17 +33,12 @@ use stdClass;
 /**
  * Renders the intermediate model into an OpenAPI 3.1.2 array.
  *
- * Component emission is scoped per render() call: schemas actually
- * referenced through $ref in the rendered paths are emitted under
- * components/schemas, plus those marked #[ApiDocSchema(standalone: true)]
- * — so filtered documents never carry dead components.
+ * Classes marked #[ApiDocSchema] always emit under components/schemas;
+ * unmarked classes render inline.
  */
 class OpenApiRenderer
 {
     use MergesAdditionalFields;
-
-    /** @var array<class-string, true> classes'd during the current render */
-    protected array $usedRefs = [];
 
     /** @var null|array<int, SpecExtension> resolved lazily from config */
     protected ?array $specExtensions = null;
@@ -56,8 +51,6 @@ class OpenApiRenderer
 
     public function render(ApiDocument $document): array
     {
-        $this->usedRefs = [];
-
         $paths = [];
 
         foreach ($document->operations as $operation) {
@@ -494,8 +487,6 @@ class OpenApiRenderer
         if ($ref !== null) {
             // Reused component: field-level overlays belong on the
             // class-level ApiSchemaDocumented, not on individual operations.
-            $this->usedRefs[$class] = true;
-
             return $ref;
         }
 
@@ -518,13 +509,7 @@ class OpenApiRenderer
             $this->registry->register($class, $this->resolver->resolve($class));
         }
 
-        $ref = $this->registry->ref($class);
-
-        if ($ref !== null) {
-            $this->usedRefs[$class] = true;
-        }
-
-        return $ref;
+        return $this->registry->ref($class);
     }
 
     /**
@@ -552,10 +537,7 @@ class OpenApiRenderer
         $schemas = [];
 
         foreach ($this->registry->reusable() as $class => $schema) {
-            // Emit referenced components plus standalone-marked schemas.
-            if (isset($this->usedRefs[$class]) || $this->registry->isStandalone($class)) {
-                $schemas[(string) $this->registry->name($class)] = $this->renderSchema($schema);
-            }
+            $schemas[(string) $this->registry->name($class)] = $this->renderSchema($schema);
         }
 
         if ($schemas !== []) {

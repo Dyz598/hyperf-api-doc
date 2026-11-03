@@ -121,8 +121,8 @@ class DocumentationGenerator
             $document->operation($operation);
         }
 
-        // After the scan: standalone-marked schemas discovered in the paths.
-        $this->registerStandaloneSchemas();
+        // After the scan: marked schemas discovered in the paths.
+        $this->registerMarkedSchemas();
 
         return $document;
     }
@@ -523,14 +523,13 @@ class DocumentationGenerator
     }
 
     /**
-     * Standalone-marked schemas found by the scanner register as
-     * components even when no operation references them.
+     * Marked schemas found by the scanner register as components even
+     * when no operation references them.
      */
-    private function registerStandaloneSchemas(): void
+    private function registerMarkedSchemas(): void
     {
-        foreach ($this->scanner->standaloneSchemas() as $class) {
+        foreach ($this->scanner->markedSchemas() as $class) {
             $this->registerSchema($class);
-            $this->registry->markStandalone($class);
         }
     }
 
