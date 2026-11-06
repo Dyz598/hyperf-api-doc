@@ -248,7 +248,7 @@ class OpenApiRenderer
         }
 
         if ($operation->requestBody !== null) {
-            $item['requestBody'] = $this->renderRequestBody($operation->requestBody);
+            $item['requestBody'] = $this->renderRequestBody($operation->requestBody, $this->pathFields($operation));
         }
 
         $item['responses'] = $this->renderResponses($operation);
@@ -317,7 +317,7 @@ class OpenApiRenderer
         return $rendered;
     }
 
-    private function renderRequestBody(ApiRequestBody $body): array
+    private function renderRequestBody(ApiRequestBody $body, array $pathFields = []): array
     {
         if ($body->composition !== null && $body->hasOverlay()) {
             throw new InvalidConfigurationException(sprintf(
@@ -336,11 +336,46 @@ class OpenApiRenderer
             ? $this->renderComposition($body->composition)
             : $this->schemaForClass($body->schemaClass, $body->hasOverlay() ? $body->overlay() : null);
 
+        $schema = $this->withoutPathFields($schema, $pathFields);
+
         $item['content'] = [
             $body->contentType => $this->mediaType($schema, $body),
         ];
 
         return [...$item, ...$body->extensionData()];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function pathFields(ApiOperation $operation): array
+    {
+        preg_match_all('/\{(\w+)\}/', $operation->path, $matches);
+
+        return $matches[1];
+    }
+
+    /**
+     * Path-bound fields are not body fields: drop them (and their
+     * required entries) from an inline schema.
+     */
+    private function withoutPathFields(array|stdClass $schema, array $fields): array|stdClass
+    {
+        if ($fields === [] || $schema instanceof stdClass || ! isset($schema['properties'])) {
+            return $schema;
+        }
+
+        $schema['properties'] = array_diff_key($schema['properties'], array_flip($fields));
+
+        if (isset($schema['required']) && $schema['required'] !== []) {
+            $schema['required'] = array_values(array_diff($schema['required'], $fields));
+
+            if ($schema['required'] === []) {
+                unset($schema['required']);
+            }
+        }
+
+        return $schema;
     }
 
     /**

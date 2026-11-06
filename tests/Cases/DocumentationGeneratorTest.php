@@ -386,6 +386,25 @@ class DocumentationGeneratorTest extends AbstractTestCase
         $this->assertArrayHasKey('422', $operation['responses'], 'The validation response is still documented');
     }
 
+    public function testMixedRouteAndBodyFormRequestOmitsPathFieldsFromBody()
+    {
+        $config = $this->config();
+        $config['scan']['paths'] = [__DIR__ . '/../Fixtures/ActionRouteParams'];
+
+        $spec = $this->generate($config);
+        $operation = $spec['paths']['/v1/route-posts/{post_id}/approve']['patch'];
+
+        $schema = $operation['requestBody']['content']['application/json']['schema'];
+
+        $this->assertArrayNotHasKey('post_id', $schema['properties']);
+        $this->assertArrayHasKey('note', $schema['properties']);
+        $this->assertSame(['note'], $schema['required']);
+
+        // The route field stays a path parameter.
+        $pathNames = array_column($operation['parameters'], 'name');
+        $this->assertContains('post_id', $pathNames);
+    }
+
     public function testMarkedSchemaEmitsAsComponent()
     {
         $config = $this->config();
