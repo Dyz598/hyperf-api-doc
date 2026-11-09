@@ -23,6 +23,7 @@ use HyperfTest\Fixtures\DTO\CreatePostData;
 use HyperfTest\Fixtures\DTO\CustomerData;
 use HyperfTest\Fixtures\DTO\TreeNode;
 use HyperfTest\Fixtures\Request\CreateUserRequest;
+use HyperfTest\Fixtures\Request\InviteOwnerRequest;
 use HyperfTest\Fixtures\Resource\PostResource;
 use HyperfTest\Fixtures\Resource\UserResource;
 
@@ -151,6 +152,29 @@ class SchemaResolverTest extends AbstractTestCase
         $this->assertTrue($parent->nullable);
         // The self-reference is documented without a type instead of recursing.
         $this->assertNull($parent->refClass);
+    }
+
+    public function testDottedOverlayPatchesNestedLeavesWithoutPhantomFields()
+    {
+        $schema = (new SchemaResolver())->resolve(InviteOwnerRequest::class);
+
+        // The overlay nests exactly like the rules; no flat "user.name"
+        // style phantom fields remain.
+        $this->assertSame(['user', 'business'], array_keys($schema->properties));
+        $this->assertSame('Owner display name.', $schema->properties['user']->properties['name']->description);
+        $this->assertSame('string', $schema->properties['user']->properties['name']->type);
+        $this->assertSame('Optional contact email.', $schema->properties['user']->properties['email']->description);
+        $this->assertSame('Business name.', $schema->properties['business']->properties['name']->description);
+        $this->assertSame('Warung Budi', $schema->properties['business']->properties['name']->example);
+
+        // Wildcard overlay descriptions land on the array items.
+        $photos = $schema->properties['business']->properties['photos'];
+        $this->assertSame('Photo file id.', $photos->items->description);
+        $this->assertSame('uuid', $photos->items->format);
+
+        // Dotted require marks every level: top-level business, nested name.
+        $this->assertContains('business', $schema->required);
+        $this->assertContains('name', $schema->properties['business']->required);
     }
 
     public function testDependenciesReturnsTransitiveClasses()

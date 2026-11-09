@@ -62,11 +62,13 @@ class ApiSchema
     }
 
     /**
-     * Get or create a property by name.
+     * Get or create a property by name; dot paths ("user.name") descend
+     * through nested object properties, with "*" addressing the array
+     * items — the same syntax as validation rules.
      */
     public function property(string $name): ApiProperty
     {
-        return $this->properties[$name] ??= new ApiProperty();
+        return $this->propertyBySegments($this->properties, explode('.', $name));
     }
 
     /**
@@ -170,11 +172,16 @@ class ApiSchema
     }
 
     /**
-     * Mark properties as required.
+     * Mark properties as required; dotted names mark every parent object
+     * along the path as well ("business.name" requires "business" and
+     * nested "name").
      */
     public function require(string ...$names): static
     {
-        $this->required = array_values(array_unique([...$this->required, ...$names]));
+        foreach ($names as $name) {
+            $this->markRequired($this->properties, $this->required, explode('.', $name));
+        }
+
         return $this;
     }
 
@@ -266,6 +273,79 @@ class ApiSchema
             $field,
             get_debug_type($enum)
         ));
+    }
+
+    /**
+     * Descend one dotted path segment at a time, creating intermediate
+     * object (or array item) properties on the way to the leaf.
+     *
+     * @param array<string, ApiProperty> $properties
+     * @param array<int, string> $segments
+     */
+    private function propertyBySegments(array &$properties, array $segments): ApiProperty
+    {
+        $segment = array_shift($segments);
+
+        $property = $properties[$segment] ??= new ApiProperty();
+
+        if ($segments === []) {
+            return $property;
+        }
+
+        $next = $segments[0];
+
+        if ($next === '*') {
+            array_shift($segments);
+
+            $property->type = 'array';
+            $property->items ??= new ApiProperty();
+
+            if ($segments === []) {
+                // "foo.*" — the path addresses the array items.
+                return $property->items;
+            }
+
+            // "foo.*.bar" — items are objects; keep descending.
+            $property->items->type = 'object';
+            $property->items->properties ??= [];
+            $property->items->required ??= [];
+
+            return $this->propertyBySegments($property->items->properties, $segments);
+        }
+
+        $property->type = 'object';
+        $property->properties ??= [];
+        $property->required ??= [];
+
+        return $this->propertyBySegments($property->properties, $segments);
+    }
+
+    /**
+     * Add each path segment to its own level's required list, cascading
+     * only while the parent properties exist.
+     *
+     * @param array<string, ApiProperty> $properties
+     * @param array<int, string> $required
+     * @param array<int, string> $segments
+     */
+    private function markRequired(array $properties, array &$required, array $segments): void
+    {
+        $segment = array_shift($segments);
+
+        if (! in_array($segment, $required, true)) {
+            $required[] = $segment;
+        }
+
+        $property = $properties[$segment] ?? null;
+
+        if ($segments === [] || $segments[0] === '*' || $property === null) {
+            return;
+        }
+
+        $property->properties ??= [];
+        $property->required ??= [];
+
+        $this->markRequired($property->properties, $property->required, $segments);
     }
 
     /**
