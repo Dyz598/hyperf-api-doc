@@ -21,5 +21,7 @@ final class HyperfClasses
 
     public const JSON_RESOURCE = 'Hyperf\Resource\Json\JsonResource';
 
+    public const MODEL = 'Hyperf\Database\Model\Model';
+
     public const RESOURCE_COLLECTION = 'Hyperf\Resource\Json\ResourceCollection';
 }

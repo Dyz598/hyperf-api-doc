@@ -41,7 +41,7 @@ use function Hyperf\Support\class_basename;
  *  2. FormRequest -> ValidationRuleParser + documentApiSchema overlay
  *  3. DTO / plain class -> constructor promotion & public property inference
  *     + documentApiSchema overlay
- *  4. JsonResource without documentation -> empty object schema
+ *  4. JsonResource / ORM model -> empty schema; ApiSchemaDocumented only
  */
 class SchemaResolver
 {
@@ -126,12 +126,13 @@ class SchemaResolver
 
         $isFormRequest = is_subclass_of($class, HyperfClasses::FORM_REQUEST);
         $isResource = is_subclass_of($class, HyperfClasses::JSON_RESOURCE);
+        $isModel = is_subclass_of($class, HyperfClasses::MODEL);
 
         if ($isFormRequest) {
             $schema = $this->parseFormRequestRules($reflection);
-        } elseif ($isResource) {
-            // JsonResource bodies cannot be inferred statically; the schema
-            // comes from ApiSchemaDocumented or stays an empty object.
+        } elseif ($isResource || $isModel) {
+            // Resource and ORM model shapes cannot be inferred statically; ORM
+            // public properties are framework flags, never the serialized row.
             $schema = new ApiSchema();
         } else {
             $schema = $this->inferFromClass($reflection);
@@ -149,9 +150,9 @@ class SchemaResolver
             }
         }
 
-        // Only undocumented, empty resource schemas get an explanatory note;
-        // FormRequest/DTO schemas speak for themselves.
-        if ($schema->description === null && $schema->properties === [] && $isResource) {
+        // Only undocumented, empty resource/model schemas get an explanatory
+        // note; FormRequest/DTO schemas speak for themselves.
+        if ($schema->description === null && $schema->properties === [] && ($isResource || $isModel)) {
             $schema->description = sprintf(
                 'Undocumented %s body; implement ApiSchemaDocumented to document its fields.',
                 class_basename($class)

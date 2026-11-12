@@ -22,6 +22,7 @@ use HyperfTest\Fixtures\DTO\CreateLoanData;
 use HyperfTest\Fixtures\DTO\CreatePostData;
 use HyperfTest\Fixtures\DTO\CustomerData;
 use HyperfTest\Fixtures\DTO\TreeNode;
+use HyperfTest\Fixtures\Model\FlaggedModel;
 use HyperfTest\Fixtures\Request\CreateUserRequest;
 use HyperfTest\Fixtures\Request\InviteOwnerRequest;
 use HyperfTest\Fixtures\Resource\PostResource;
@@ -115,6 +116,18 @@ class SchemaResolverTest extends AbstractTestCase
             $schema->properties['status']->enum
         );
         $this->assertSame('Current publication status.', $schema->properties['status']->description);
+    }
+
+    public function testResolvesOrmModelSchemaFromContractOnly()
+    {
+        $schema = (new SchemaResolver())->resolve(FlaggedModel::class);
+
+        // Redeclared framework flags never leak into the schema.
+        $this->assertSame(['status'], array_keys($schema->properties));
+        $this->assertSame(
+            array_map(static fn (UserStatus $status) => $status->value, UserStatus::cases()),
+            $schema->properties['status']->enum
+        );
     }
 
     public function testResolutionIsCached()
