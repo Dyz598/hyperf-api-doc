@@ -350,7 +350,7 @@ class OpenApiRenderer
      */
     private function pathFields(ApiOperation $operation): array
     {
-        preg_match_all('/\{(\w+)\}/', $operation->path, $matches);
+        preg_match_all('/\{([\w-]+)\}/', $operation->path, $matches);
 
         return $matches[1];
     }

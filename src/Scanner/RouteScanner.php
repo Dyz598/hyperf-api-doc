@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace HyperfApiDoc\Scanner;
 
+use FastRoute\BadRouteException;
+use FastRoute\RouteParser\Std;
 use FilesystemIterator;
 use Hyperf\HttpServer\Annotation\AutoController;
 use Hyperf\HttpServer\Annotation\Controller;
@@ -208,7 +210,9 @@ class RouteScanner
             ));
             $httpMethods = $httpMethods === [] ? self::DEFAULT_ROUTE_METHODS : $httpMethods;
 
-            return [$this->joinPath((string) ($controller->prefix ?? ''), (string) ($mapping->path ?? '')), $httpMethods];
+            $path = $this->joinPath((string) ($controller->prefix ?? ''), (string) ($mapping->path ?? ''));
+
+            return [$this->normalizePath($path, $method), $httpMethods];
         }
 
         if ($controller instanceof AutoController) {
@@ -218,10 +222,42 @@ class RouteScanner
                 return [null, []];
             }
 
-            return [$this->joinPath((string) $controller->prefix, $method->getName()), $methods];
+            $path = $this->joinPath((string) $controller->prefix, $method->getName());
+
+            return [$this->normalizePath($path, $method), $methods];
         }
 
         return [null, []];
+    }
+
+    /**
+     * Rewrite a Hyperf route pattern as a documentation path: constraints
+     * are dropped and optional segments expand, using the same parser the
+     * runtime dispatcher uses so documented and dispatched routes agree.
+     */
+    private function normalizePath(string $path, ReflectionMethod $method): string
+    {
+        try {
+            $variants = (new Std())->parse($path);
+        } catch (BadRouteException $exception) {
+            throw new InvalidConfigurationException(sprintf(
+                'Invalid route pattern [%s] on [%s::%s]: %s',
+                $path,
+                $method->getDeclaringClass()->getName(),
+                $method->getName(),
+                $exception->getMessage()
+            ), 0, $exception);
+        }
+
+        $expanded = $variants[count($variants) - 1];
+
+        $normalized = '';
+
+        foreach ($expanded as $part) {
+            $normalized .= is_array($part) ? '{' . $part[0] . '}' : $part;
+        }
+
+        return $normalized;
     }
 
     /**
