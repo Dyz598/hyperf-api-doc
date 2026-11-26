@@ -32,6 +32,11 @@ use HyperfTest\Fixtures\Action\Post\ListPostsAction;
 use HyperfTest\Fixtures\Action\Report\ReportAction;
 use HyperfTest\Fixtures\Action\Shared\StatusAction;
 use HyperfTest\Fixtures\Action\User\CreateUserAction;
+use HyperfTest\Fixtures\ActionConstrained\OptionalSavingsDetailAction;
+use HyperfTest\Fixtures\ActionConstrained\PrefixedSavingsDetailAction;
+use HyperfTest\Fixtures\ActionConstrained\SavingsDetailAction;
+use HyperfTest\Fixtures\ActionConstrained\UuidSavingsDetailAction;
+use HyperfTest\Fixtures\ActionMalformedRoute\MalformedSavingsAction;
 use HyperfTest\Fixtures\Attribute\TestAuthAttribute;
 use HyperfTest\Fixtures\Attribute\TestWithResourceAttribute;
 use HyperfTest\Fixtures\Naming\ControllerStyleNamer;
@@ -253,6 +258,56 @@ class RouteScannerTest extends AbstractTestCase
         );
     }
 
+    public function testConstrainedRouteParamDocumentsAsCleanPlaceholder()
+    {
+        $operation = $this->scanFixture('ActionConstrained')[SavingsDetailAction::class . '::handle'];
+
+        $this->assertSame('/v1/savings/{id}', $operation->path);
+        $this->assertSame(['id'], array_keys($operation->parameters));
+        $this->assertSame('path', $operation->parameters['id']->in);
+    }
+
+    public function testUuidConstraintYieldsNoPhantomParameters()
+    {
+        $operation = $this->scanFixture('ActionConstrained')[UuidSavingsDetailAction::class . '::handle'];
+
+        $this->assertSame('/v1/savings/{id}', $operation->path);
+        $this->assertSame(['id'], array_keys($operation->parameters));
+    }
+
+    public function testOptionalSegmentExpandsToFullyPresentVariant()
+    {
+        $operation = $this->scanFixture('ActionConstrained')[OptionalSavingsDetailAction::class . '::handle'];
+
+        $this->assertSame('/v1/savings/{id}', $operation->path);
+        $this->assertSame(['id'], array_keys($operation->parameters));
+    }
+
+    public function testConstraintInControllerPrefixIsNormalized()
+    {
+        $operation = $this->scanFixture('ActionConstrained')[PrefixedSavingsDetailAction::class . '::handle'];
+
+        $this->assertSame('/v1/savings/{id}/detail', $operation->path);
+        $this->assertSame(['id'], array_keys($operation->parameters));
+    }
+
+    public function testExcludePatternsMatchNormalizedConstrainedPaths()
+    {
+        $config = $this->config();
+        $config['scan']['paths'] = [__DIR__ . '/../Fixtures/ActionConstrainedExclude'];
+        $config['discovery']['exclude'] = ['#^/v1/savings/\{id\}$#'];
+
+        $this->assertSame([], (new RouteScanner($config))->scan());
+    }
+
+    public function testMalformedRouteReportsControllerAndMethod()
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage(MalformedSavingsAction::class . '::handle');
+
+        $this->scanFixture('ActionMalformedRoute');
+    }
+
     public function testAutoControllerWithoutMethodsYieldsNoOperation()
     {
         $operations = $this->scan();
@@ -309,6 +364,17 @@ class RouteScannerTest extends AbstractTestCase
     private function scan(): array
     {
         return $this->scanWith($this->config());
+    }
+
+    /**
+     * @return array<string, ApiOperation>
+     */
+    private function scanFixture(string $fixture): array
+    {
+        $config = $this->config();
+        $config['scan']['paths'] = [__DIR__ . '/../Fixtures/' . $fixture];
+
+        return $this->scanWith($config);
     }
 
     /**

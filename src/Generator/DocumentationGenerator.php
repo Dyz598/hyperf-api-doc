@@ -215,7 +215,7 @@ class DocumentationGenerator
             return false;
         }
 
-        preg_match_all('/\{(\w+)\}/', $operation->path, $matches);
+        preg_match_all('/\{([\w-]+)\}/', $operation->path, $matches);
 
         return array_diff($fields, $matches[1]) === [];
     }

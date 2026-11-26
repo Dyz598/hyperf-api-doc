@@ -278,6 +278,19 @@ class DocumentationGeneratorTest extends AbstractTestCase
         $this->assertArrayHasKey('CustomerData', $spec['components']['schemas']);
     }
 
+    public function testDuplicateNormalizedRoutesAreRejected()
+    {
+        $config = $this->config();
+        $config['scan']['paths'] = [__DIR__ . '/../Fixtures/ActionDuplicateRoutes'];
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessageMatches(
+            '#^Duplicate route \[get /v1/savings/\{id\}\] detected for operations \[DuplicateSavingsActions::(numeric|lookup)\] and \[DuplicateSavingsActions::(lookup|numeric)\]\.$#'
+        );
+
+        $this->generate($config);
+    }
+
     public function testDuplicateResponseStatusIsRejected()
     {
         $operation = new ApiOperation();
@@ -403,6 +416,49 @@ class DocumentationGeneratorTest extends AbstractTestCase
         // The route field stays a path parameter.
         $pathNames = array_column($operation['parameters'], 'name');
         $this->assertContains('post_id', $pathNames);
+    }
+
+    public function testHyphenatedConstrainedParamStaysOutOfBody()
+    {
+        $config = $this->config();
+        $config['scan']['paths'] = [__DIR__ . '/../Fixtures/ActionConstrainedTransfer'];
+
+        $spec = $this->generate($config);
+        $operation = $spec['paths']['/v1/transfers/{transfer-id}']['patch'];
+
+        $pathNames = array_column($operation['parameters'], 'name');
+        $this->assertContains('transfer-id', $pathNames);
+
+        $schema = $operation['requestBody']['content']['application/json']['schema'];
+        $this->assertArrayNotHasKey('transfer-id', $schema['properties']);
+        $this->assertArrayHasKey('note', $schema['properties']);
+        $this->assertSame(['note'], $schema['required']);
+    }
+
+    public function testConstrainedPathFieldIsOmittedFromInlineBody()
+    {
+        $config = $this->config();
+        $config['scan']['paths'] = [__DIR__ . '/../Fixtures/ActionConstrainedBody'];
+
+        $spec = $this->generate($config);
+        $operation = $spec['paths']['/v1/savings/{id}']['post'];
+
+        $schema = $operation['requestBody']['content']['application/json']['schema'];
+
+        $this->assertArrayNotHasKey('id', $schema['properties']);
+        $this->assertSame(['note'], $schema['required']);
+    }
+
+    public function testConstrainedRouteOnlyFormRequestHasNoRequestBody()
+    {
+        $config = $this->config();
+        $config['scan']['paths'] = [__DIR__ . '/../Fixtures/ActionConstrainedFormOnly'];
+
+        $spec = $this->generate($config);
+        $operation = $spec['paths']['/v1/savings/{id}']['get'];
+
+        $this->assertArrayNotHasKey('requestBody', $operation);
+        $this->assertContains('id', array_column($operation['parameters'], 'name'));
     }
 
     public function testMarkedSchemaEmitsAsComponent()
